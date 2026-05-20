@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	goten "github.com/dnahilman/goten"
+	adp "github.com/dnahilman/goten/adapter"
 )
 
 // MockAdapter is an in-memory Adapter for unit tests.
@@ -13,13 +13,13 @@ type MockAdapter struct {
 	data map[string][]map[string]any
 }
 
-var _ goten.Adapter = (*MockAdapter)(nil)
+var _ adp.Adapter = (*MockAdapter)(nil)
 
 func NewMockAdapter() *MockAdapter {
 	return &MockAdapter{data: make(map[string][]map[string]any)}
 }
 
-func (m *MockAdapter) FindOne(ctx context.Context, model string, q goten.Query) (map[string]any, error) {
+func (m *MockAdapter) FindOne(ctx context.Context, model string, q adp.Query) (map[string]any, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for _, row := range m.data[model] {
@@ -30,7 +30,7 @@ func (m *MockAdapter) FindOne(ctx context.Context, model string, q goten.Query) 
 	return nil, nil
 }
 
-func (m *MockAdapter) FindMany(ctx context.Context, model string, q goten.Query) ([]map[string]any, error) {
+func (m *MockAdapter) FindMany(ctx context.Context, model string, q adp.Query) ([]map[string]any, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var out []map[string]any
@@ -50,7 +50,7 @@ func (m *MockAdapter) Create(ctx context.Context, model string, data map[string]
 	return copyRow(cp), nil
 }
 
-func (m *MockAdapter) Update(ctx context.Context, model string, q goten.Query, data map[string]any) (map[string]any, error) {
+func (m *MockAdapter) Update(ctx context.Context, model string, q adp.Query, data map[string]any) (map[string]any, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i, row := range m.data[model] {
@@ -64,7 +64,7 @@ func (m *MockAdapter) Update(ctx context.Context, model string, q goten.Query, d
 	return nil, nil
 }
 
-func (m *MockAdapter) Delete(ctx context.Context, model string, q goten.Query) error {
+func (m *MockAdapter) Delete(ctx context.Context, model string, q adp.Query) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var kept []map[string]any
@@ -77,12 +77,12 @@ func (m *MockAdapter) Delete(ctx context.Context, model string, q goten.Query) e
 	return nil
 }
 
-func (m *MockAdapter) Count(ctx context.Context, model string, q goten.Query) (int64, error) {
+func (m *MockAdapter) Count(ctx context.Context, model string, q adp.Query) (int64, error) {
 	rows, err := m.FindMany(ctx, model, q)
 	return int64(len(rows)), err
 }
 
-func matchesAll(row map[string]any, wheres []goten.Where) bool {
+func matchesAll(row map[string]any, wheres []adp.Where) bool {
 	for _, w := range wheres {
 		if w.Operator == "=" && row[w.Field] != w.Value {
 			return false

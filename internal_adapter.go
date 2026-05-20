@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"time"
 
+	adp "github.com/dnahilman/goten/adapter"
 	"github.com/dnahilman/goten/crypto"
 	"github.com/dnahilman/goten/models"
 )
 
 // InternalAdapter provides typed CRUD methods on top of the raw Adapter interface.
-// Handlers use this instead of calling Adapter directly.
 type InternalAdapter struct {
-	adapter Adapter
+	adapter adp.Adapter
 }
 
-func NewInternalAdapter(a Adapter) *InternalAdapter {
+func NewInternalAdapter(a adp.Adapter) *InternalAdapter {
 	return &InternalAdapter{adapter: a}
 }
 
@@ -46,7 +46,7 @@ func (ia *InternalAdapter) CreateUserWithExtra(ctx context.Context, email, name 
 }
 
 func (ia *InternalAdapter) FindUserByID(ctx context.Context, id string) (*models.User, error) {
-	rec, err := ia.adapter.FindOne(ctx, "users", Query{Where: []Where{EQ("id", id)}})
+	rec, err := ia.adapter.FindOne(ctx, "users", adp.Query{Where: []adp.Where{adp.EQ("id", id)}})
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (ia *InternalAdapter) FindUserByID(ctx context.Context, id string) (*models
 }
 
 func (ia *InternalAdapter) FindUserByEmail(ctx context.Context, email string) (*models.User, error) {
-	rec, err := ia.adapter.FindOne(ctx, "users", Query{Where: []Where{EQ("email", email)}})
+	rec, err := ia.adapter.FindOne(ctx, "users", adp.Query{Where: []adp.Where{adp.EQ("email", email)}})
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (ia *InternalAdapter) FindUserByEmail(ctx context.Context, email string) (*
 
 func (ia *InternalAdapter) UpdateUser(ctx context.Context, id string, data map[string]any) (*models.User, error) {
 	data["updated_at"] = time.Now().UTC()
-	rec, err := ia.adapter.Update(ctx, "users", Query{Where: []Where{EQ("id", id)}}, data)
+	rec, err := ia.adapter.Update(ctx, "users", adp.Query{Where: []adp.Where{adp.EQ("id", id)}}, data)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (ia *InternalAdapter) UpdateUser(ctx context.Context, id string, data map[s
 }
 
 func (ia *InternalAdapter) DeleteUser(ctx context.Context, id string) error {
-	return ia.adapter.Delete(ctx, "users", Query{Where: []Where{EQ("id", id)}})
+	return ia.adapter.Delete(ctx, "users", adp.Query{Where: []adp.Where{adp.EQ("id", id)}})
 }
 
 // --- Accounts ---
@@ -103,8 +103,8 @@ func (ia *InternalAdapter) CreateAccount(ctx context.Context, userID, accountID,
 }
 
 func (ia *InternalAdapter) FindAccountByProviderAndID(ctx context.Context, providerID, accountID string) (*models.Account, error) {
-	rec, err := ia.adapter.FindOne(ctx, "accounts", Query{
-		Where: []Where{EQ("provider_id", providerID), EQ("account_id", accountID)},
+	rec, err := ia.adapter.FindOne(ctx, "accounts", adp.Query{
+		Where: []adp.Where{adp.EQ("provider_id", providerID), adp.EQ("account_id", accountID)},
 	})
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (ia *InternalAdapter) FindAccountByProviderAndID(ctx context.Context, provi
 }
 
 func (ia *InternalAdapter) FindAccountsByUserID(ctx context.Context, userID string) ([]*models.Account, error) {
-	recs, err := ia.adapter.FindMany(ctx, "accounts", Query{Where: []Where{EQ("user_id", userID)}})
+	recs, err := ia.adapter.FindMany(ctx, "accounts", adp.Query{Where: []adp.Where{adp.EQ("user_id", userID)}})
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (ia *InternalAdapter) UpdatePassword(ctx context.Context, userID, hashedPas
 		})
 		return err
 	}
-	_, err = ia.adapter.Update(ctx, "accounts", Query{Where: []Where{EQ("id", acc.ID)}}, map[string]any{
+	_, err = ia.adapter.Update(ctx, "accounts", adp.Query{Where: []adp.Where{adp.EQ("id", acc.ID)}}, map[string]any{
 		"password":   hashedPassword,
 		"updated_at": time.Now().UTC(),
 	})
