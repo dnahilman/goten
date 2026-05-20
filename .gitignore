@@ -1,0 +1,41 @@
+# Documentation & planning (local-only, tracked via GitHub Issues)
+docs/
+
+# Claude Code local settings
+.claude/
+
+# Build output
+bin/
+dist/
+
+# Go test artifacts
+*.test
+*.out
+coverage.txt
+coverage.html
+profile.out
+
+# Go module cache (kalau ada vendor lokal)
+vendor/
+
+# IDE/editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+.env.local
+*.local
+
+# Local config overrides
+goten.config.local.yaml
+
+# Docker volumes
+postgres-data/
