@@ -1,15 +1,40 @@
+run:
+  timeout: 5m
+  go: "1.22"
+
 linters:
   enable:
-    - govet
     - errcheck
-    - staticcheck
-    - unused
     - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+    - unparam
+    - revive
 
 linters-settings:
   errcheck:
     check-type-assertions: true
+  revive:
+    rules:
+      - name: exported
+      - name: var-naming
+      - name: package-comments
+        disabled: true
 
-run:
-  go: "1.22"
-  timeout: 5m
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - unparam
+  exclude-dirs:
+    - examples
+    - bin
+    - docs

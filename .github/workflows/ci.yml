@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: goten
+          POSTGRES_USER: goten
+          POSTGRES_PASSWORD: goten
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Sync workspace
+        run: go work sync
+
+      - name: Build all modules
+        run: |
+          go build ./...
+          cd adapters/gorm && go build ./...
+          cd ../../plugins/username && go build ./...
+          cd ../../cmd/goten && go build ./...
+          cd ../../test && go build ./...
+          cd ../examples/basic && go build ./...
+
+      - name: Unit tests
+        run: |
+          go test ./internal/...
+          cd test && go test ./...
+
+      - name: Integration tests
+        env:
+          GOTEN_TEST_DSN: postgres://goten:goten@localhost:5432/goten?sslmode=disable
+        run: |
+          cd test && go test -tags integration ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
