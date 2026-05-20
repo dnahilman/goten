@@ -4,5 +4,6 @@ use (
 	.
 	./adapters/gorm
 	./cmd/goten
+	./plugins/username
 	./test
 )

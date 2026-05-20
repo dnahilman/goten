@@ -19,6 +19,9 @@ func NewInternalAdapter(a adp.Adapter) *InternalAdapter {
 	return &InternalAdapter{adapter: a}
 }
 
+// Adapter returns the raw underlying adapter for plugins that need direct access.
+func (ia *InternalAdapter) Adapter() adp.Adapter { return ia.adapter }
+
 // --- Users ---
 
 func (ia *InternalAdapter) CreateUser(ctx context.Context, email, name string, emailVerified bool) (*models.User, error) {

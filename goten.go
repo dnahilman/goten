@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/dnahilman/goten/models"
 	"github.com/dnahilman/goten/session"
 )
 
@@ -88,6 +89,13 @@ func (a *Auth) Adapter() Adapter                  { return a.cfg.Adapter }
 func (a *Auth) InternalAdapter() *InternalAdapter { return a.ia }
 func (a *Auth) Sessions() *session.Manager        { return a.sessions }
 func (a *Auth) Plugins() []Plugin                 { return a.plugins }
+
+// SetSessionCookie is a plugin-friendly helper that sets the session cookie
+// using Auth's configured cookie settings. Plugins call this instead of
+// accessing the internal cookieConfig directly.
+func (a *Auth) SetSessionCookie(w http.ResponseWriter, sess *models.Session) {
+	session.SetCookie(w, a.cookieConfig(), sess.Token, sess.ExpiresAt)
+}
 
 func (a *Auth) cookieConfig() session.CookieConfig {
 	return session.CookieConfig{
