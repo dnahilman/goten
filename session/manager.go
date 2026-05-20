@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	goten "github.com/dnahilman/goten"
+	adp "github.com/dnahilman/goten/adapter"
 	"github.com/dnahilman/goten/crypto"
 	"github.com/dnahilman/goten/models"
 )
@@ -19,7 +19,7 @@ var (
 
 // Manager handles session lifecycle: create, validate (with sliding refresh), and revoke.
 type Manager struct {
-	adapter   goten.Adapter
+	adapter   adp.Adapter
 	expiresIn time.Duration
 	updateAge time.Duration
 }
@@ -29,7 +29,7 @@ type Config struct {
 	UpdateAge time.Duration // sliding refresh threshold, default 1 day
 }
 
-func NewManager(adapter goten.Adapter, cfg Config) *Manager {
+func NewManager(a adp.Adapter, cfg Config) *Manager {
 	expiresIn := cfg.ExpiresIn
 	if expiresIn == 0 {
 		expiresIn = 7 * 24 * time.Hour
@@ -38,7 +38,7 @@ func NewManager(adapter goten.Adapter, cfg Config) *Manager {
 	if updateAge == 0 {
 		updateAge = 24 * time.Hour
 	}
-	return &Manager{adapter: adapter, expiresIn: expiresIn, updateAge: updateAge}
+	return &Manager{adapter: a, expiresIn: expiresIn, updateAge: updateAge}
 }
 
 func (m *Manager) Create(ctx context.Context, userID, ipAddress, userAgent string) (*models.Session, error) {
@@ -69,8 +69,8 @@ func (m *Manager) Create(ctx context.Context, userID, ipAddress, userAgent strin
 }
 
 func (m *Manager) FindByToken(ctx context.Context, token string) (*models.Session, error) {
-	rec, err := m.adapter.FindOne(ctx, "sessions", goten.Query{
-		Where: []goten.Where{goten.EQ("token", token)},
+	rec, err := m.adapter.FindOne(ctx, "sessions", adp.Query{
+		Where: []adp.Where{adp.EQ("token", token)},
 	})
 	if err != nil {
 		return nil, err
@@ -96,13 +96,11 @@ func (m *Manager) Validate(ctx context.Context, token string) (*models.Session, 
 		_ = m.RevokeByID(ctx, sess.ID)
 		return nil, ErrSessionExpired
 	}
-
-	// Sliding refresh: extend expires_at if session hasn't been updated recently.
 	age := time.Now().UTC().Sub(sess.UpdatedAt)
 	if age >= m.updateAge {
 		newExpiry := time.Now().UTC().Add(m.expiresIn)
 		rec, err := m.adapter.Update(ctx, "sessions",
-			goten.Query{Where: []goten.Where{goten.EQ("id", sess.ID)}},
+			adp.Query{Where: []adp.Where{adp.EQ("id", sess.ID)}},
 			map[string]any{
 				"expires_at": newExpiry,
 				"updated_at": time.Now().UTC(),
@@ -116,20 +114,20 @@ func (m *Manager) Validate(ctx context.Context, token string) (*models.Session, 
 }
 
 func (m *Manager) Revoke(ctx context.Context, token string) error {
-	return m.adapter.Delete(ctx, "sessions", goten.Query{
-		Where: []goten.Where{goten.EQ("token", token)},
+	return m.adapter.Delete(ctx, "sessions", adp.Query{
+		Where: []adp.Where{adp.EQ("token", token)},
 	})
 }
 
 func (m *Manager) RevokeByID(ctx context.Context, sessionID string) error {
-	return m.adapter.Delete(ctx, "sessions", goten.Query{
-		Where: []goten.Where{goten.EQ("id", sessionID)},
+	return m.adapter.Delete(ctx, "sessions", adp.Query{
+		Where: []adp.Where{adp.EQ("id", sessionID)},
 	})
 }
 
 func (m *Manager) ListByUserID(ctx context.Context, userID string) ([]*models.Session, error) {
-	recs, err := m.adapter.FindMany(ctx, "sessions", goten.Query{
-		Where: []goten.Where{goten.EQ("user_id", userID)},
+	recs, err := m.adapter.FindMany(ctx, "sessions", adp.Query{
+		Where: []adp.Where{adp.EQ("user_id", userID)},
 	})
 	if err != nil {
 		return nil, err

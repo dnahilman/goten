@@ -6,20 +6,20 @@ import (
 	"fmt"
 	"strings"
 
-	goten "github.com/dnahilman/goten"
+	adp "github.com/dnahilman/goten/adapter"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-// Adapter implements goten.Adapter using GORM.
+// Adapter implements adp.Adapter using GORM.
 type Adapter struct {
 	db *gorm.DB
 }
 
 // compile-time interface check
-var _ goten.Adapter = (*Adapter)(nil)
+var _ adp.Adapter = (*Adapter)(nil)
 
-// New creates a new GORM adapter. Silences GORM's internal logger.
+// New creates a new GORM adapter with silent logger.
 func New(db *gorm.DB) *Adapter {
 	return &Adapter{db: db.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)})}
 }
@@ -29,12 +29,9 @@ var validOperators = map[string]bool{
 	">=": true, "<=": true, "in": true, "like": true,
 }
 
-func isValidOperator(op string) bool {
-	return validOperators[strings.ToLower(op)]
-}
+func isValidOperator(op string) bool { return validOperators[strings.ToLower(op)] }
 
 // quoteIdent wraps a column name in double-quotes (Postgres standard).
-// Only allows identifiers containing alphanumeric chars and underscores.
 func quoteIdent(name string) (string, error) {
 	for _, c := range name {
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
@@ -44,7 +41,7 @@ func quoteIdent(name string) (string, error) {
 	return `"` + name + `"`, nil
 }
 
-func (a *Adapter) applyWheres(tx *gorm.DB, wheres []goten.Where) (*gorm.DB, error) {
+func (a *Adapter) applyWheres(tx *gorm.DB, wheres []adp.Where) (*gorm.DB, error) {
 	for _, w := range wheres {
 		op := strings.ToLower(w.Operator)
 		if !isValidOperator(op) {
@@ -63,7 +60,7 @@ func (a *Adapter) applyWheres(tx *gorm.DB, wheres []goten.Where) (*gorm.DB, erro
 	return tx, nil
 }
 
-func (a *Adapter) FindOne(ctx context.Context, model string, q goten.Query) (map[string]any, error) {
+func (a *Adapter) FindOne(ctx context.Context, model string, q adp.Query) (map[string]any, error) {
 	tx := a.db.WithContext(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
@@ -90,7 +87,7 @@ func (a *Adapter) FindOne(ctx context.Context, model string, q goten.Query) (map
 	return result, nil
 }
 
-func (a *Adapter) FindMany(ctx context.Context, model string, q goten.Query) ([]map[string]any, error) {
+func (a *Adapter) FindMany(ctx context.Context, model string, q adp.Query) ([]map[string]any, error) {
 	tx := a.db.WithContext(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
@@ -127,22 +124,19 @@ func (a *Adapter) Create(ctx context.Context, model string, data map[string]any)
 	return data, nil
 }
 
-func (a *Adapter) Update(ctx context.Context, model string, q goten.Query, data map[string]any) (map[string]any, error) {
+func (a *Adapter) Update(ctx context.Context, model string, q adp.Query, data map[string]any) (map[string]any, error) {
 	tx := a.db.WithContext(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
 		return nil, err
 	}
-	// Select explicit keys so zero-values (false, "") are not skipped by GORM.
-	keys := keysOf(data)
-	if err := tx.Select(keys).Updates(data).Error; err != nil {
+	if err := tx.Select(keysOf(data)).Updates(data).Error; err != nil {
 		return nil, err
 	}
-	// Re-fetch to return the updated record.
 	return a.FindOne(ctx, model, q)
 }
 
-func (a *Adapter) Delete(ctx context.Context, model string, q goten.Query) error {
+func (a *Adapter) Delete(ctx context.Context, model string, q adp.Query) error {
 	tx := a.db.WithContext(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
@@ -151,7 +145,7 @@ func (a *Adapter) Delete(ctx context.Context, model string, q goten.Query) error
 	return tx.Delete(nil).Error
 }
 
-func (a *Adapter) Count(ctx context.Context, model string, q goten.Query) (int64, error) {
+func (a *Adapter) Count(ctx context.Context, model string, q adp.Query) (int64, error) {
 	tx := a.db.WithContext(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
