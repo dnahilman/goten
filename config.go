@@ -13,6 +13,7 @@ type Config struct {
 	BasePath       string
 	Secret         string
 	Adapter        Adapter
+	Plugins        []Plugin
 	Session        SessionConfig
 	Cookie         CookieConfig
 	EmailPassword  EmailPasswordConfig

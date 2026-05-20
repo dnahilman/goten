@@ -2,6 +2,7 @@
 package goten
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -14,6 +15,10 @@ type Auth struct {
 	ia       *InternalAdapter
 	sessions *session.Manager
 	handler  http.Handler
+
+	plugins            []Plugin
+	userCreateHooks    []UserCreateHookFn
+	sessionCreateHooks []SessionCreateHookFn
 }
 
 // New creates an Auth instance. Returns error for invalid config — never panics.
@@ -23,22 +28,66 @@ func New(cfg Config) (*Auth, error) {
 		return nil, fmt.Errorf("goten: %w", err)
 	}
 	a := &Auth{
-		cfg: cfg,
-		ia:  NewInternalAdapter(cfg.Adapter),
+		cfg:     cfg,
+		plugins: cfg.Plugins,
+		ia:      NewInternalAdapter(cfg.Adapter),
 	}
 	a.sessions = session.NewManager(cfg.Adapter, session.Config{
 		ExpiresIn: cfg.Session.ExpiresIn,
 		UpdateAge: cfg.Session.UpdateAge,
 	})
+
+	// Plugin lifecycle: SetAuth → collect hooks → Init → buildRouter
+	for _, p := range a.plugins {
+		if aware, ok := p.(AuthAware); ok {
+			aware.SetAuth(a)
+		}
+	}
+	for _, p := range a.plugins {
+		if uh, ok := p.(UserCreateHookProvider); ok {
+			a.userCreateHooks = append(a.userCreateHooks, uh.UserCreateHooks()...)
+		}
+		if sh, ok := p.(SessionCreateHookProvider); ok {
+			a.sessionCreateHooks = append(a.sessionCreateHooks, sh.SessionCreateHooks()...)
+		}
+	}
+	for _, p := range a.plugins {
+		if init, ok := p.(Initializer); ok {
+			if err := init.Init(); err != nil {
+				return nil, fmt.Errorf("goten: plugin %q init failed: %w", p.ID(), err)
+			}
+		}
+	}
+
 	a.handler = a.buildRouter()
 	return a, nil
 }
 
-func (a *Auth) Handler() http.Handler          { return a.handler }
-func (a *Auth) Config() Config                 { return a.cfg }
-func (a *Auth) Adapter() Adapter               { return a.cfg.Adapter }
+// RunUserCreateHooks applies all user-create hooks to data in registration order.
+func (a *Auth) RunUserCreateHooks(data map[string]any) map[string]any {
+	for _, h := range a.userCreateHooks {
+		data = h(data)
+	}
+	return data
+}
+
+// RunSessionCreateHooks runs all session-create veto hooks.
+// Returns ErrHookHandled if a hook already wrote the response (caller must not write again).
+func (a *Auth) RunSessionCreateHooks(w http.ResponseWriter, r *http.Request, userID string) error {
+	for _, h := range a.sessionCreateHooks {
+		if err := h(SessionCreateContext{UserID: userID, Request: r, Writer: w}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *Auth) Handler() http.Handler             { return a.handler }
+func (a *Auth) Config() Config                    { return a.cfg }
+func (a *Auth) Adapter() Adapter                  { return a.cfg.Adapter }
 func (a *Auth) InternalAdapter() *InternalAdapter { return a.ia }
-func (a *Auth) Sessions() *session.Manager     { return a.sessions }
+func (a *Auth) Sessions() *session.Manager        { return a.sessions }
+func (a *Auth) Plugins() []Plugin                 { return a.plugins }
 
 func (a *Auth) cookieConfig() session.CookieConfig {
 	return session.CookieConfig{
@@ -50,3 +99,6 @@ func (a *Auth) cookieConfig() session.CookieConfig {
 		SameSite: a.cfg.Cookie.SameSite,
 	}
 }
+
+// isHookHandled is a helper so callers don't need to import errors themselves.
+func isHookHandled(err error) bool { return errors.Is(err, ErrHookHandled) }
