@@ -20,6 +20,7 @@ func (e *APIError) WriteJSON(w http.ResponseWriter) {
 }
 
 var (
+	ErrInvalidToken    = &APIError{Code: "INVALID_TOKEN", Message: "invalid session token", Status: 401}
 	ErrInvalidEmail    = &APIError{Code: "INVALID_EMAIL", Message: "invalid email", Status: 400}
 	ErrInvalidPassword = &APIError{Code: "INVALID_CREDENTIALS", Message: "invalid email or password", Status: 400}
 	ErrEmailExists     = &APIError{Code: "EMAIL_EXISTS", Message: "email already exists", Status: 409}
