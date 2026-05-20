@@ -5,7 +5,8 @@ go 1.22
 require (
 	github.com/dnahilman/goten v0.0.0
 	github.com/dnahilman/goten/adapters/gorm v0.0.0
-	github.com/stretchr/testify v1.9.0
+	github.com/dnahilman/goten/plugins/username v0.0.0
+	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.34.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.34.0
 	gorm.io/driver/postgres v1.5.9
@@ -72,4 +73,5 @@ require (
 replace (
 	github.com/dnahilman/goten => ..
 	github.com/dnahilman/goten/adapters/gorm => ../adapters/gorm
+	github.com/dnahilman/goten/plugins/username => ../plugins/username
 )
