@@ -19,5 +19,13 @@ func (a *Auth) buildRouter() http.Handler {
 	mux.HandleFunc("POST "+bp+"/revoke-session", a.handleRevokeSession)
 	mux.HandleFunc("POST "+bp+"/revoke-other-sessions", a.handleRevokeOtherSessions)
 
+	for _, p := range a.plugins {
+		if ep, ok := p.(EndpointProvider); ok {
+			for _, e := range ep.Endpoints() {
+				mux.HandleFunc(e.Method+" "+bp+e.Path, e.Handler)
+			}
+		}
+	}
+
 	return a.middlewareOriginCheck(mux)
 }

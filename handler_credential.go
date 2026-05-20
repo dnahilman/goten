@@ -62,7 +62,8 @@ func (a *Auth) handleSignUpEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := a.ia.CreateUser(ctx, req.Email, req.Name, false)
+	extra := a.RunUserCreateHooks(map[string]any{})
+	user, err := a.ia.CreateUserWithExtra(ctx, req.Email, req.Name, false, extra)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL", "internal error")
 		return
@@ -75,6 +76,12 @@ func (a *Auth) handleSignUpEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if ep.AutoSignIn {
+		if err := a.RunSessionCreateHooks(w, r, user.ID); err != nil {
+			if !isHookHandled(err) {
+				httputil.WriteError(w, http.StatusForbidden, "FORBIDDEN", err.Error())
+			}
+			return
+		}
 		sess, err := a.sessions.Create(ctx, user.ID,
 			internal.GetClientIP(r, ""),
 			r.UserAgent(),
@@ -137,6 +144,13 @@ func (a *Auth) handleSignInEmail(w http.ResponseWriter, r *http.Request) {
 	ok, err := crypto.VerifyPassword(hash, req.Password)
 	if err != nil || !ok {
 		httputil.WriteError(w, http.StatusBadRequest, "INVALID_CREDENTIALS", "invalid email or password")
+		return
+	}
+
+	if err := a.RunSessionCreateHooks(w, r, user.ID); err != nil {
+		if !isHookHandled(err) {
+			httputil.WriteError(w, http.StatusForbidden, "FORBIDDEN", err.Error())
+		}
 		return
 	}
 
