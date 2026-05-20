@@ -7,11 +7,13 @@ import (
 	goten "github.com/dnahilman/goten"
 )
 
-// MockAdapter is an in-memory Adapter for use in tests.
+// MockAdapter is an in-memory Adapter for unit tests.
 type MockAdapter struct {
 	mu   sync.RWMutex
-	data map[string][]map[string]any // model -> rows
+	data map[string][]map[string]any
 }
+
+var _ goten.Adapter = (*MockAdapter)(nil)
 
 func NewMockAdapter() *MockAdapter {
 	return &MockAdapter{data: make(map[string][]map[string]any)}
@@ -20,11 +22,9 @@ func NewMockAdapter() *MockAdapter {
 func (m *MockAdapter) FindOne(ctx context.Context, model string, q goten.Query) (map[string]any, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	rows := m.data[model]
-	for _, row := range rows {
+	for _, row := range m.data[model] {
 		if matchesAll(row, q.Where) {
-			cp := copyRow(row)
-			return cp, nil
+			return copyRow(row), nil
 		}
 	}
 	return nil, nil
