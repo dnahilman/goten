@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-Email **dios.dev.eight@gmail.com** with:
+Email **dna.hilman@gmail.com** with:
 
 - Description of the vulnerability
 - Steps to reproduce
