@@ -1,4 +1,5 @@
-.PHONY: help build test test-integration tidy lint fmt cli example pg-up pg-down migrate clean release-check
+.PHONY: help build test test-integration tidy lint fmt cli example pg-up pg-down migrate clean release-check \
+	tag-core tag-adapter-gorm tag-plugin-username tag-cmd
 
 help:
 	@echo "Goten Makefile"
@@ -15,7 +16,12 @@ help:
 	@echo "  pg-down            Stop Postgres"
 	@echo "  migrate            Apply all pending migrations"
 	@echo "  clean              Remove bin/ and Go test cache"
-	@echo "  release-check      Full check before tagging (build + test + lint)"
+	@echo "  release-check         Full check before tagging (build + test + lint)"
+	@echo ""
+	@echo "  tag-core              Tag core module          (VERSION=v0.x.x)"
+	@echo "  tag-adapter-gorm      Tag adapters/gorm module (VERSION=v0.x.x)"
+	@echo "  tag-plugin-username   Tag plugins/username     (VERSION=v0.x.x)"
+	@echo "  tag-cmd               Tag cmd/goten module     (VERSION=v0.x.x)"
 
 build:
 	go build ./...
@@ -74,3 +80,29 @@ clean:
 
 release-check: build test lint
 	@echo "✓ Ready to tag release"
+
+# ── Per-module tagging ────────────────────────────────────────────────────────
+# Usage: make tag-core VERSION=v0.1.0
+tag-core:
+	@test -n "$(VERSION)" || (echo "Usage: make tag-core VERSION=v0.1.0"; exit 1)
+	git tag $(VERSION)
+	git push origin $(VERSION)
+	@echo "✓ core tagged $(VERSION)"
+
+tag-adapter-gorm:
+	@test -n "$(VERSION)" || (echo "Usage: make tag-adapter-gorm VERSION=v0.1.0"; exit 1)
+	git tag adapters/gorm/$(VERSION)
+	git push origin adapters/gorm/$(VERSION)
+	@echo "✓ adapters/gorm tagged $(VERSION)"
+
+tag-plugin-username:
+	@test -n "$(VERSION)" || (echo "Usage: make tag-plugin-username VERSION=v0.1.0"; exit 1)
+	git tag plugins/username/$(VERSION)
+	git push origin plugins/username/$(VERSION)
+	@echo "✓ plugins/username tagged $(VERSION)"
+
+tag-cmd:
+	@test -n "$(VERSION)" || (echo "Usage: make tag-cmd VERSION=v0.1.0"; exit 1)
+	git tag cmd/goten/$(VERSION)
+	git push origin cmd/goten/$(VERSION)
+	@echo "✓ cmd/goten tagged $(VERSION)"
