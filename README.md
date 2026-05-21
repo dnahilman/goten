@@ -1,6 +1,6 @@
 # Goten
 
-> Composable authentication for Go — inspired by [better-auth](https://better-auth.com), [Limen](https://limenauth.dev), and [Go-better-auth](https://github.com/iambpn/go-better-auth).
+> **Go Language Otentikasi** — composable authentication for Go, inspired by [better-auth](https://better-auth.com), [Limen](https://limenauth.dev), and [Go-better-auth](https://github.com/iambpn/go-better-auth).
 
 [![CI](https://github.com/dnahilman/goten/actions/workflows/ci.yml/badge.svg)](https://github.com/dnahilman/goten/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/dnahilman/goten.svg)](https://pkg.go.dev/github.com/dnahilman/goten)
