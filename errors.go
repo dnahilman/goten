@@ -16,7 +16,7 @@ func (e *APIError) Error() string { return e.Message }
 func (e *APIError) WriteJSON(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(e.Status)
-	json.NewEncoder(w).Encode(map[string]any{"error": e})
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": e})
 }
 
 var (

@@ -11,7 +11,7 @@ func IsValidEmail(email string) bool {
 	return emailRe.MatchString(email)
 }
 
-func ValidatePassword(password string, min, max int) error {
+func Password(password string, min, max int) error {
 	l := len(password)
 	if l < min {
 		return fmt.Errorf("password must be at least %d characters", min)
