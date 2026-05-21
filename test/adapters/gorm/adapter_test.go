@@ -20,6 +20,14 @@ func setupDB(t *testing.T) (*gormadapter.Adapter, func()) {
 	t.Helper()
 	db, cleanup := testutil.StartPostgres(t)
 
+	// Drop existing tables so tests on a shared DB start with a clean slate.
+	require.NoError(t, db.Exec(`
+		DROP TABLE IF EXISTS accounts;
+		DROP TABLE IF EXISTS sessions;
+		DROP TABLE IF EXISTS users;
+		DROP TABLE IF EXISTS goten_migrations;
+	`).Error)
+
 	// Apply migration
 	sql, err := os.ReadFile("../../../migrations/20260520120000_initial.up.sql")
 	require.NoError(t, err)

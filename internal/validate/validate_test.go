@@ -19,8 +19,8 @@ func TestIsValidEmail(t *testing.T) {
 	}
 }
 
-func TestValidatePassword(t *testing.T) {
-	assert.NoError(t, validate.ValidatePassword("secret123", 8, 72))
-	assert.Error(t, validate.ValidatePassword("short", 8, 72))
-	assert.Error(t, validate.ValidatePassword(string(make([]byte, 73)), 8, 72))
+func TestPassword(t *testing.T) {
+	assert.NoError(t, validate.Password("secret123", 8, 72))
+	assert.Error(t, validate.Password("short", 8, 72))
+	assert.Error(t, validate.Password(string(make([]byte, 73)), 8, 72))
 }

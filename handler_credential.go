@@ -36,7 +36,7 @@ func (a *Auth) handleSignUpEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ep := a.cfg.EmailPassword
-	if err := validate.ValidatePassword(req.Password, ep.MinPasswordLength, ep.MaxPasswordLength); err != nil {
+	if err := validate.Password(req.Password, ep.MinPasswordLength, ep.MaxPasswordLength); err != nil {
 		if len(req.Password) < ep.MinPasswordLength {
 			httputil.WriteError(w, http.StatusBadRequest, "PASSWORD_TOO_SHORT", err.Error())
 		} else {
