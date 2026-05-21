@@ -1,6 +1,6 @@
 module github.com/dnahilman/goten/examples/basic
 
-go 1.22
+go 1.23
 
 require (
 	github.com/dnahilman/goten v0.0.0
@@ -18,9 +18,9 @@ require (
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	golang.org/x/crypto v0.24.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/crypto v0.28.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
 )
 
 replace (
