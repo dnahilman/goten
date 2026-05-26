@@ -5,6 +5,7 @@ use (
 	./adapters/gorm
 	./cmd/goten
 	./examples/basic
+	./examples/layered-gin
 	./plugins/username
 	./test
 )
