@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **CLI** — `goten init` now writes everything to `cfg.Migrations.CoreDir` (flat). Per-plugin destination subdirectories are no longer created.
 - **CLI** — Import-scan validator: after `goten init` runs, it walks your project's `*.go` files and warns when the set of imported `github.com/dnahilman/goten/plugins/*` packages drifts from `migrations.plugins` in YAML (in either direction). Skip with `--no-scan`.
+- **Example** — `examples/layered-gin/`: minimal Goten + Gin app organized as `handler → service → repository → model`. Demonstrates the Gin middleware wrapper for `RequireAuth`, a separate `app_user_profiles` table joined to `goten_users`, and `db.AutoMigrate` for the domain table. Postgres on port 5433 to coexist with `examples/basic`.
 
 ### Added
 

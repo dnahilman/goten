@@ -30,6 +30,10 @@ go get github.com/dnahilman/goten/adapters/gorm
 
 For a full walkthrough — database setup, migrations, runnable example, and end-to-end testing with `curl` — see the **[Quick Start guide on the Wiki](https://github.com/dnahilman/goten/wiki/Quick-Start)**.
 
+Runnable examples in the repo:
+- [`examples/basic/`](examples/basic/) — minimal `net/http` server.
+- [`examples/layered-gin/`](examples/layered-gin/) — Gin + GORM + layered architecture (`handler → service → repository`).
+
 ## Endpoints
 
 | Method | Path | Description |
