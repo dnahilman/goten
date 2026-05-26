@@ -28,45 +28,7 @@ go get github.com/dnahilman/goten
 go get github.com/dnahilman/goten/adapters/gorm
 ```
 
-```go
-package main
-
-import (
-    "log"
-    "net/http"
-
-    goten "github.com/dnahilman/goten"
-    gormadapter "github.com/dnahilman/goten/adapters/gorm"
-    "gorm.io/driver/postgres"
-    "gorm.io/gorm"
-)
-
-func main() {
-    db, _ := gorm.Open(postgres.Open("postgres://..."), &gorm.Config{})
-
-    auth, err := goten.New(goten.Config{
-        BaseURL: "http://localhost:8080",
-        Secret:  "your-32-byte-secret-key-here!!!!",
-        Adapter: gormadapter.New(db),
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Mount auth endpoints at /api/auth/*
-    http.Handle("/api/auth/", auth.Handler())
-
-    // Protect your own endpoints
-    http.Handle("/api/me", auth.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        user, _ := goten.UserFromContext(r.Context())
-        // user.ID, user.Email, user.Name ...
-    })))
-
-    http.ListenAndServe(":8080", nil)
-}
-```
-
-See [`examples/basic/`](examples/basic/) for a full runnable example with Docker Compose.
+For a full walkthrough — database setup, migrations, runnable example, and end-to-end testing with `curl` — see the **[Quick Start guide on the Wiki](https://github.com/dnahilman/goten/wiki/Quick-Start)**.
 
 ## Endpoints
 
