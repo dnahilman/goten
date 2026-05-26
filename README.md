@@ -73,6 +73,8 @@ migrations:
   table: goten_migrations
 ```
 
+**Editor autocomplete:** add `# yaml-language-server: $schema=https://raw.githubusercontent.com/dnahilman/goten/main/goten.config.schema.json` as the first line of your `goten.config.yaml` for autocomplete + inline validation in VS Code (Red Hat YAML extension), JetBrains, and other editors. See [`examples/basic/goten.config.yaml`](examples/basic/goten.config.yaml).
+
 ## Plugins
 
 ### Username Plugin

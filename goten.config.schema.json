@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/dnahilman/goten/main/goten.config.schema.json",
+  "title": "Goten CLI Configuration",
+  "description": "Configuration file for the goten CLI tool. Drives `goten init`, `goten migrate up/down/status/generate`, and .env loading.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "env_file": {
+      "type": "string",
+      "description": "Path to a .env file loaded before YAML interpolation. Cannot itself use ${VAR} (env not yet loaded when this field is read). Missing file is a fatal error.",
+      "examples": [".env", "./config/.env.staging"]
+    },
+    "database": {
+      "type": "object",
+      "description": "Database connection used by goten migrate commands.",
+      "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Database DSN. Supports ${VAR} interpolation against the process environment (and any values loaded from env_file).",
+          "examples": [
+            "postgres://user:pass@localhost:5432/mydb?sslmode=disable",
+            "${DATABASE_URL}"
+          ]
+        },
+        "driver": {
+          "type": "string",
+          "enum": ["postgres"],
+          "default": "postgres",
+          "description": "Database driver. Only postgres is supported in v0.1."
+        }
+      }
+    },
+    "migrations": {
+      "type": "object",
+      "description": "Migration discovery and bootstrap settings.",
+      "additionalProperties": false,
+      "properties": {
+        "core_dir": {
+          "type": "string",
+          "default": "./migrations",
+          "description": "Directory holding core migration SQL files. `goten init` writes here; `goten migrate up/down/status` reads from here."
+        },
+        "plugins": {
+          "type": "array",
+          "description": "Enabled plugins. Each entry is either a shorthand name (e.g. \"username\" → ./plugins/username/migrations) or an explicit path to that plugin's migrations directory.",
+          "items": {
+            "type": "string",
+            "examples": ["username", "./plugins/username/migrations"]
+          },
+          "default": []
+        },
+        "table": {
+          "type": "string",
+          "default": "goten_migrations",
+          "description": "Tracking table name for applied migrations."
+        }
+      }
+    },
+    "generate_dir": {
+      "type": "string",
+      "description": "Where `goten migrate generate <name>` writes new migration template files. Defaults to migrations.core_dir."
+    }
+  }
+}
