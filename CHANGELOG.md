@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **CLI** — `${VAR}` environment-variable interpolation in `goten.config.yaml`. Use e.g. `url: ${GOTEN_DATABASE_URL}` to keep credentials out of the committed config. Bare `$VAR` (no braces) is left untouched so passwords containing literal `$` remain safe.
+
 ## [0.1.0] - 2026-05-20
 
 ### Added
