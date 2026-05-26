@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed (breaking, pre-v1)
+
+- **Migrations layout is now flat.** All SQL files (core + plugin) live in a single directory (`cfg.Migrations.CoreDir`, default `./migrations`). Plugin attribution is encoded in the filename: `<timestamp>_<plugin>_<name>.{up,down}.sql`. The legacy nested layout (`./plugins/<name>/migrations/`) is no longer supported by the discovery walker.
+- **Source migration files renamed** to the new convention:
+  - `migrations/20260520120000_initial.{up,down}.sql` → `20260520120000_core_initial.{up,down}.sql`
+  - `plugins/username/migrations/20260520130000_add_username.{up,down}.sql` → `20260520130000_username_add_username.{up,down}.sql`
+- **`migrations.plugins[]` semantics**: now strictly a list of plugin **shorthand names** to scaffold via `goten init` (e.g. `- username`). Explicit-path entries (`- ./plugins/username/migrations`) are no longer accepted. The field is no longer read by `goten migrate up/down/status` — those commands walk only `core_dir`.
+
+### Added
+
+- **CLI** — `goten init` now writes everything to `cfg.Migrations.CoreDir` (flat). Per-plugin destination subdirectories are no longer created.
+- **CLI** — Import-scan validator: after `goten init` runs, it walks your project's `*.go` files and warns when the set of imported `github.com/dnahilman/goten/plugins/*` packages drifts from `migrations.plugins` in YAML (in either direction). Skip with `--no-scan`.
+
 ### Added
 
 - **CLI** — `${VAR}` environment-variable interpolation in `goten.config.yaml`. Use e.g. `url: ${GOTEN_DATABASE_URL}` to keep credentials out of the committed config. Bare `$VAR` (no braces) is left untouched so passwords containing literal `$` remain safe.

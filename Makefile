@@ -69,7 +69,7 @@ pg-down:
 	docker-compose -f docker-compose.dev.yml down
 
 migrate: cli
-	./bin/goten migrate up
+	cd examples/basic && ../../bin/goten init && ../../bin/goten migrate up
 
 example: cli pg-up migrate
 	cd examples/basic && go run .

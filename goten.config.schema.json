@@ -45,10 +45,11 @@
         },
         "plugins": {
           "type": "array",
-          "description": "Enabled plugins. Each entry is either a shorthand name (e.g. \"username\" → ./plugins/username/migrations) or an explicit path to that plugin's migrations directory.",
+          "description": "Plugin shorthand names that `goten init` should scaffold into the flat migrations directory. Each name must be registered with the CLI (run `goten init` with an unknown name to see the available list).",
           "items": {
             "type": "string",
-            "examples": ["username", "./plugins/username/migrations"]
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "examples": ["username"]
           },
           "default": []
         },

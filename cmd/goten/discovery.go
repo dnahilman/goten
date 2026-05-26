@@ -4,48 +4,44 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
 
-// (resolvePluginEntry lives in registry.go and is reused here.)
-
 // Migration represents a single versioned migration (up + optional down).
 type Migration struct {
-	ID       string // timestamp, e.g. "20260520120000"
+	ID       string // 14-digit timestamp, e.g. "20260520120000"
 	Name     string // human name, e.g. "initial"
-	FullName string // "<ts>_<name>"
-	Plugin   string // "core" or plugin folder name
+	FullName string // "<ts>_<plugin>_<name>"
+	Plugin   string // "core" or plugin shorthand (extracted from filename)
 	UpPath   string
 	DownPath string // may be empty if .down.sql is missing
 }
 
-// discoverMigrations walks the core dir and any plugin dirs listed in config.
-// Returns migrations sorted ascending by ID (timestamp).
+// migrationFilenamePattern enforces the flat-layout naming convention:
+//
+//	<timestamp>_<plugin>_<name>.up.sql
+//	<timestamp>_<plugin>_<name>.down.sql
+//
+// where <plugin> is "core" for core migrations or a plugin shorthand name.
+var migrationFilenamePattern = regexp.MustCompile(`^(\d{14})_([a-z][a-z0-9]*)_(.+)\.up\.sql$`)
+
+// discoverMigrations walks a single flat directory (cfg.Migrations.CoreDir)
+// and returns all migrations sorted ascending by ID (timestamp).
+// Plugin attribution is encoded in each filename, not in directory structure.
 func discoverMigrations(cfg *Config) ([]*Migration, error) {
-	var all []*Migration
-
-	coreMigs, err := walkDir(cfg.Migrations.CoreDir, "core")
+	migs, err := walkDir(cfg.Migrations.CoreDir)
 	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("core migrations dir %q: %w", cfg.Migrations.CoreDir, err)
+		return nil, fmt.Errorf("migrations dir %q: %w", cfg.Migrations.CoreDir, err)
 	}
-	all = append(all, coreMigs...)
-
-	for _, entry := range cfg.Migrations.Plugins {
-		pluginName, pluginDir := resolvePluginEntry(entry)
-		pluginMigs, err := walkDir(pluginDir, pluginName)
-		if err != nil && !os.IsNotExist(err) {
-			return nil, fmt.Errorf("plugin migrations dir %q: %w", pluginDir, err)
-		}
-		all = append(all, pluginMigs...)
-	}
-
-	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
-	return all, nil
+	sort.Slice(migs, func(i, j int) bool { return migs[i].ID < migs[j].ID })
+	return migs, nil
 }
 
 // walkDir reads *.up.sql files from a directory and builds Migration entries.
-func walkDir(dir, plugin string) ([]*Migration, error) {
+// Filenames that don't match the <ts>_<plugin>_<name>.up.sql pattern are skipped.
+func walkDir(dir string) ([]*Migration, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -55,13 +51,13 @@ func walkDir(dir, plugin string) ([]*Migration, error) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".up.sql") {
 			continue
 		}
-		base := strings.TrimSuffix(e.Name(), ".up.sql")
-		parts := strings.SplitN(base, "_", 2)
-		if len(parts) != 2 {
+		m := migrationFilenamePattern.FindStringSubmatch(e.Name())
+		if m == nil {
 			continue
 		}
-		ts, name := parts[0], parts[1]
-		downName := fmt.Sprintf("%s_%s.down.sql", ts, name)
+		ts, plugin, name := m[1], m[2], m[3]
+		base := strings.TrimSuffix(e.Name(), ".up.sql")
+		downName := base + ".down.sql"
 		downPath := filepath.Join(dir, downName)
 		if _, err := os.Stat(downPath); os.IsNotExist(err) {
 			downPath = "" // missing down file — allowed, error only if `down` is called

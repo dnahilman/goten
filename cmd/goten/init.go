@@ -21,37 +21,48 @@ func cmdInit(_ context.Context, c *cli.Command) error {
 		c.Root().String("config"),
 		c.Root().String("env-file"),
 		c.Bool("force"),
+		c.Bool("no-scan"),
 		os.Stdout,
 	)
 }
 
 // runInit bootstraps a project by copying embedded migration SQL files for
-// core + any plugins declared in goten.config.yaml into the project.
-// Idempotent: identical files are skipped, divergent files require force.
-func runInit(configPath, envFile string, force bool, out io.Writer) error {
+// core + any plugins declared in goten.config.yaml into a single flat
+// directory (cfg.Migrations.CoreDir). Plugin attribution is encoded in
+// each file's name. Idempotent: identical files are skipped, divergent
+// files require force.
+//
+// Unless noScan is set, runInit also walks the current directory for Go
+// import statements and warns when those drift from migrations.plugins.
+func runInit(configPath, envFile string, force, noScan bool, out io.Writer) error {
 	cfg, err := loadConfigBestEffort(configPath, envFile)
 	if err != nil {
 		return err
 	}
 
-	coreStats, err := copyEmbedDir(coreSource, "migrations", cfg.Migrations.CoreDir, force)
+	dest := cfg.Migrations.CoreDir
+
+	coreStats, err := copyEmbedDir(coreSource, "migrations", dest, force)
 	if err != nil {
 		return fmt.Errorf("core: %w", err)
 	}
 	fmt.Fprintf(out, "%-12s %s\n", "core:", coreStats)
 
-	for _, entry := range cfg.Migrations.Plugins {
-		name, dir := resolvePluginEntry(entry)
+	for _, name := range cfg.Migrations.Plugins {
 		src, ok := pluginSource[name]
 		if !ok {
 			return fmt.Errorf("unknown plugin %q in migrations.plugins (available: %s)",
 				name, strings.Join(availablePluginNames(), ", "))
 		}
-		stats, err := copyEmbedDir(src, "migrations", dir, force)
+		stats, err := copyEmbedDir(src, "migrations", dest, force)
 		if err != nil {
 			return fmt.Errorf("plugin %s: %w", name, err)
 		}
 		fmt.Fprintf(out, "%-12s %s\n", name+":", stats)
+	}
+
+	if !noScan {
+		printImportScanWarnings(out, cfg.Migrations.Plugins)
 	}
 	return nil
 }

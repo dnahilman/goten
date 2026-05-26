@@ -35,6 +35,10 @@ func main() {
 						Name:  "force",
 						Usage: "overwrite files that already exist with different content",
 					},
+					&cli.BoolFlag{
+						Name:  "no-scan",
+						Usage: "skip the Go-import scan that warns about drift between code and migrations.plugins",
+					},
 				},
 			},
 			{

@@ -4,9 +4,5 @@ database:
   driver: postgres
 
 migrations:
-  core_dir: ../../migrations
   plugins:
-    - ../../plugins/username/migrations
-  table: goten_migrations
-
-generate_dir: ../../migrations
+    - username

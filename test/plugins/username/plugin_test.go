@@ -29,11 +29,11 @@ func TestPlugin_Migrations(t *testing.T) {
 	fsys := p.Migrations()
 	require.NotNil(t, fsys)
 
-	up, err := fsys.Open("20260520130000_add_username.up.sql")
+	up, err := fsys.Open("20260520130000_username_add_username.up.sql")
 	require.NoError(t, err, "up migration file should exist")
 	up.Close()
 
-	down, err := fsys.Open("20260520130000_add_username.down.sql")
+	down, err := fsys.Open("20260520130000_username_add_username.down.sql")
 	require.NoError(t, err, "down migration file should exist")
 	down.Close()
 }

@@ -67,9 +67,8 @@ database:
   url: postgres://user:pass@localhost:5432/mydb?sslmode=disable
 
 migrations:
-  core_dir: ./migrations
   plugins:
-    - ./plugins/username/migrations
+    - username
   table: goten_migrations
 ```
 
