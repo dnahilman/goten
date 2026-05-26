@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+// (resolvePluginEntry lives in registry.go and is reused here.)
+
 // Migration represents a single versioned migration (up + optional down).
 type Migration struct {
 	ID       string // timestamp, e.g. "20260520120000"
@@ -29,9 +31,8 @@ func discoverMigrations(cfg *Config) ([]*Migration, error) {
 	}
 	all = append(all, coreMigs...)
 
-	for _, pluginDir := range cfg.Migrations.Plugins {
-		// Derive plugin name: ./plugins/username/migrations → "username"
-		pluginName := filepath.Base(filepath.Dir(pluginDir))
+	for _, entry := range cfg.Migrations.Plugins {
+		pluginName, pluginDir := resolvePluginEntry(entry)
 		pluginMigs, err := walkDir(pluginDir, pluginName)
 		if err != nil && !os.IsNotExist(err) {
 			return nil, fmt.Errorf("plugin migrations dir %q: %w", pluginDir, err)

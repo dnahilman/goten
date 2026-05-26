@@ -10,6 +10,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **CLI** — `${VAR}` environment-variable interpolation in `goten.config.yaml`. Use e.g. `url: ${GOTEN_DATABASE_URL}` to keep credentials out of the committed config. Bare `$VAR` (no braces) is left untouched so passwords containing literal `$` remain safe.
 - **CLI** — automatic `.env` loading from the current working directory, plus `--env-file <path>` flag (Docker-style) for explicit paths. Real environment variables are not overridden — `.env` only fills in missing values.
 - **CLI** — `env_file:` field in `goten.config.yaml` to declare the `.env` path inline (e.g. `env_file: ./config/.env.staging`), removing the need for a CLI flag on every invocation. Precedence: `--env-file` flag > `env_file` YAML field > default `.env` in CWD.
+- **CLI** — new top-level `goten init` command scaffolds embedded core + plugin migration SQL files into your project. Reads `goten.config.yaml`'s `migrations.plugins:` list, looks up each plugin in the CLI's internal registry, and copies its SQL files to the project. Idempotent: identical files are skipped, divergent files require `--force`. Unknown plugin names error with the available list. Bootstraps cleanly when no config file exists yet.
+- **CLI** — `migrations.plugins:` now accepts plugin **shorthand names** (e.g. `- username`) in addition to explicit paths. Shorthand expands to `./plugins/<name>/migrations` for both reading (migrate up/down) and writing (init).
+- **Core** — `goten.CoreMigrationsFS` (`embed.FS`) exposes the core schema migrations for consumption by the CLI's `init` command.
+- **Username plugin** — `usernameplugin.MigrationsFS` (renamed from unexported `migrationsFS`) exposes the plugin's migrations to the CLI registry.
 
 ## [0.1.0] - 2026-05-20
 

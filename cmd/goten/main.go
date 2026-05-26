@@ -27,6 +27,17 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			{
+				Name:   "init",
+				Usage:  "Scaffold core + plugin migration SQL files into your project",
+				Action: cmdInit,
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:  "force",
+						Usage: "overwrite files that already exist with different content",
+					},
+				},
+			},
+			{
 				Name:  "migrate",
 				Usage: "Database migration commands",
 				Commands: []*cli.Command{
