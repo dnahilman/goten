@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **CLI** — `${VAR}` environment-variable interpolation in `goten.config.yaml`. Use e.g. `url: ${GOTEN_DATABASE_URL}` to keep credentials out of the committed config. Bare `$VAR` (no braces) is left untouched so passwords containing literal `$` remain safe.
 - **CLI** — automatic `.env` loading from the current working directory, plus `--env-file <path>` flag (Docker-style) for explicit paths. Real environment variables are not overridden — `.env` only fills in missing values.
+- **CLI** — `env_file:` field in `goten.config.yaml` to declare the `.env` path inline (e.g. `env_file: ./config/.env.staging`), removing the need for a CLI flag on every invocation. Precedence: `--env-file` flag > `env_file` YAML field > default `.env` in CWD.
 
 ## [0.1.0] - 2026-05-20
 
