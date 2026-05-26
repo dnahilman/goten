@@ -8,6 +8,15 @@ docs/
 bin/
 dist/
 
+# Go build artifacts (accidental `go build` in a cmd/example dir)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/cmd/goten/goten
+/examples/basic/basic
+
 # Go test artifacts
 *.test
 *.out
