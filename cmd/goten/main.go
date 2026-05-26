@@ -20,6 +20,10 @@ func main() {
 				Value:   "goten.config.yaml",
 				Usage:   "path to config file",
 			},
+			&cli.StringFlag{
+				Name:  "env-file",
+				Usage: "path to .env file (default: .env in current directory if it exists)",
+			},
 		},
 		Commands: []*cli.Command{
 			{

@@ -20,7 +20,7 @@ func cmdMigrateGenerate(ctx context.Context, c *cli.Command) error {
 		return fmt.Errorf("migration name must contain at least one alphanumeric character")
 	}
 
-	cfg, err := loadConfig(c.Root().String("config"))
+	cfg, err := loadConfig(c.Root().String("config"), c.Root().String("env-file"))
 	if err != nil {
 		return err
 	}

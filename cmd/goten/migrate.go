@@ -12,7 +12,7 @@ import (
 )
 
 func cmdMigrateUp(ctx context.Context, c *cli.Command) error {
-	cfg, err := loadConfig(c.Root().String("config"))
+	cfg, err := loadConfig(c.Root().String("config"), c.Root().String("env-file"))
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func cmdMigrateUp(ctx context.Context, c *cli.Command) error {
 }
 
 func cmdMigrateDown(ctx context.Context, c *cli.Command) error {
-	cfg, err := loadConfig(c.Root().String("config"))
+	cfg, err := loadConfig(c.Root().String("config"), c.Root().String("env-file"))
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func cmdMigrateDown(ctx context.Context, c *cli.Command) error {
 }
 
 func cmdMigrateStatus(ctx context.Context, c *cli.Command) error {
-	cfg, err := loadConfig(c.Root().String("config"))
+	cfg, err := loadConfig(c.Root().String("config"), c.Root().String("env-file"))
 	if err != nil {
 		return err
 	}

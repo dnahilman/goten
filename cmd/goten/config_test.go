@@ -6,7 +6,7 @@ import (
 )
 
 func TestLoadConfig_ParseYAML(t *testing.T) {
-	cfg, err := loadConfig("testdata/sample.config.yaml")
+	cfg, err := loadConfig("testdata/sample.config.yaml", "")
 	if err != nil {
 		t.Fatalf("loadConfig: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestLoadConfig_ParseYAML(t *testing.T) {
 
 func TestLoadConfig_EnvOverride(t *testing.T) {
 	t.Setenv("GOTEN_DATABASE_URL", "postgres://env@host/db")
-	cfg, err := loadConfig("testdata/sample.config.yaml")
+	cfg, err := loadConfig("testdata/sample.config.yaml", "")
 	if err != nil {
 		t.Fatalf("loadConfig: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestLoadConfig_EnvOverride(t *testing.T) {
 }
 
 func TestLoadConfig_MissingFile(t *testing.T) {
-	_, err := loadConfig("testdata/nonexistent.yaml")
+	_, err := loadConfig("testdata/nonexistent.yaml", "")
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
@@ -56,7 +56,7 @@ func TestLoadConfig_MissingURL(t *testing.T) {
 	_, _ = f.WriteString("database:\n  driver: postgres\n")
 	f.Close()
 
-	_, err = loadConfig(f.Name())
+	_, err = loadConfig(f.Name(), "")
 	if err == nil {
 		t.Fatal("expected error when database.url is missing")
 	}
@@ -73,7 +73,7 @@ func TestLoadConfig_EnvInterpolation(t *testing.T) {
 	_, _ = f.WriteString("database:\n  url: ${TEST_DB_URL}\nmigrations:\n  table: ${TEST_TABLE}\n")
 	f.Close()
 
-	cfg, err := loadConfig(f.Name())
+	cfg, err := loadConfig(f.Name(), "")
 	if err != nil {
 		t.Fatalf("loadConfig: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestLoadConfig_EnvInterpolation_BareDollarUntouched(t *testing.T) {
 	_, _ = f.WriteString("database:\n  url: \"postgres://u:p$PASS@host/db\"\n")
 	f.Close()
 
-	cfg, err := loadConfig(f.Name())
+	cfg, err := loadConfig(f.Name(), "")
 	if err != nil {
 		t.Fatalf("loadConfig: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestLoadConfig_EnvInterpolation_MissingVarExpandsEmpty(t *testing.T) {
 	_, _ = f.WriteString("database:\n  url: ${DEFINITELY_UNSET_VAR_XYZ}\n")
 	f.Close()
 
-	_, err = loadConfig(f.Name())
+	_, err = loadConfig(f.Name(), "")
 	if err == nil {
 		t.Fatal("expected error when interpolated database.url is empty")
 	}
@@ -131,7 +131,7 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	_, _ = f.WriteString("database:\n  url: postgres://x@host/db\n")
 	f.Close()
 
-	cfg, err := loadConfig(f.Name())
+	cfg, err := loadConfig(f.Name(), "")
 	if err != nil {
 		t.Fatalf("loadConfig: %v", err)
 	}
@@ -143,5 +143,98 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	}
 	if cfg.Migrations.Table != "goten_migrations" {
 		t.Errorf("expected default table, got %s", cfg.Migrations.Table)
+	}
+}
+
+func TestLoadConfig_DotenvExplicit(t *testing.T) {
+	envPath := t.TempDir() + "/custom.env"
+	if err := os.WriteFile(envPath, []byte("DOTENV_TEST_URL=postgres://from-dotenv@host/db\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfgPath := t.TempDir() + "/c.yaml"
+	if err := os.WriteFile(cfgPath, []byte("database:\n  url: ${DOTENV_TEST_URL}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	os.Unsetenv("DOTENV_TEST_URL")
+	t.Cleanup(func() { os.Unsetenv("DOTENV_TEST_URL") })
+
+	cfg, err := loadConfig(cfgPath, envPath)
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	if cfg.Database.URL != "postgres://from-dotenv@host/db" {
+		t.Errorf("expected interpolated URL from dotenv, got: %s", cfg.Database.URL)
+	}
+}
+
+func TestLoadConfig_DotenvExplicitMissing(t *testing.T) {
+	cfgPath := t.TempDir() + "/c.yaml"
+	_ = os.WriteFile(cfgPath, []byte("database:\n  url: postgres://x/db\n"), 0644)
+
+	_, err := loadConfig(cfgPath, t.TempDir()+"/nonexistent.env")
+	if err == nil {
+		t.Fatal("expected error when explicit --env-file is missing")
+	}
+}
+
+func TestLoadConfig_DotenvCWDAutoLoad(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(dir+"/.env", []byte("AUTO_LOADED_URL=postgres://auto@host/db\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir+"/c.yaml", []byte("database:\n  url: ${AUTO_LOADED_URL}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	os.Unsetenv("AUTO_LOADED_URL")
+	t.Cleanup(func() { os.Unsetenv("AUTO_LOADED_URL") })
+
+	oldWD, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWD) })
+
+	cfg, err := loadConfig("c.yaml", "")
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	if cfg.Database.URL != "postgres://auto@host/db" {
+		t.Errorf("expected .env auto-loaded, got: %s", cfg.Database.URL)
+	}
+}
+
+func TestLoadConfig_DotenvCWDMissingNoError(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(dir+"/c.yaml", []byte("database:\n  url: postgres://no-dotenv/db\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	oldWD, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWD) })
+
+	if _, err := loadConfig("c.yaml", ""); err != nil {
+		t.Fatalf("missing .env should not be fatal, got: %v", err)
+	}
+}
+
+func TestLoadConfig_DotenvDoesNotOverrideExistingEnv(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(dir+"/.env", []byte("EXISTING_VAR=from-file\n"), 0644)
+	_ = os.WriteFile(dir+"/c.yaml", []byte("database:\n  url: postgres://x/${EXISTING_VAR}\n"), 0644)
+
+	t.Setenv("EXISTING_VAR", "from-real-env")
+
+	oldWD, _ := os.Getwd()
+	_ = os.Chdir(dir)
+	t.Cleanup(func() { _ = os.Chdir(oldWD) })
+
+	cfg, err := loadConfig("c.yaml", "")
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	if cfg.Database.URL != "postgres://x/from-real-env" {
+		t.Errorf("real env must win over .env file, got: %s", cfg.Database.URL)
 	}
 }

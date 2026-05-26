@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"regexp"
 
+	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 )
 
@@ -31,7 +34,32 @@ func expandEnv(s string) string {
 	})
 }
 
-func loadConfig(path string) (*Config, error) {
+// loadDotenv populates os.Environ from a .env file before config parsing.
+// If explicit is non-empty, that path is required and must exist.
+// If explicit is empty, ".env" in the current directory is loaded when present
+// (missing is fine; any other read/parse error is fatal).
+// Existing environment variables are NOT overridden — explicit env wins over file.
+func loadDotenv(explicit string) error {
+	path := explicit
+	if path == "" {
+		if _, err := os.Stat(".env"); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			return fmt.Errorf("stat .env: %w", err)
+		}
+		path = ".env"
+	}
+	if err := godotenv.Load(path); err != nil {
+		return fmt.Errorf("load env file %q: %w", path, err)
+	}
+	return nil
+}
+
+func loadConfig(path, envFile string) (*Config, error) {
+	if err := loadDotenv(envFile); err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config %q: %w (create a goten.config.yaml or use --config)", path, err)

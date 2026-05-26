@@ -3,6 +3,7 @@ module github.com/dnahilman/goten/cmd/goten
 go 1.23
 
 require (
+	github.com/joho/godotenv v1.5.1
 	github.com/urfave/cli/v3 v3.9.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.9
