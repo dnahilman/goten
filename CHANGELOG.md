@@ -14,6 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **CLI** — `migrations.plugins:` now accepts plugin **shorthand names** (e.g. `- username`) in addition to explicit paths. Shorthand expands to `./plugins/<name>/migrations` for both reading (migrate up/down) and writing (init).
 - **Core** — `goten.CoreMigrationsFS` (`embed.FS`) exposes the core schema migrations for consumption by the CLI's `init` command.
 - **Username plugin** — `usernameplugin.MigrationsFS` (renamed from unexported `migrationsFS`) exposes the plugin's migrations to the CLI registry.
+- **Docs** — published JSON Schema at [`goten.config.schema.json`](goten.config.schema.json) for editor autocomplete and inline validation of `goten.config.yaml`. Add the `# yaml-language-server: $schema=…` magic comment to your config to enable it in VS Code (Red Hat YAML extension), JetBrains, and other LSP-aware editors.
 
 ## [0.1.0] - 2026-05-20
 
