@@ -8,8 +8,11 @@ import (
 	goten "github.com/dnahilman/goten"
 )
 
+// MigrationsFS holds the username plugin's schema migrations.
+// Exposed so the `goten init` CLI command can copy them into a user's project.
+//
 //go:embed migrations/*.sql
-var migrationsFS embed.FS
+var MigrationsFS embed.FS
 
 var defaultUsernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,32}$`)
 
@@ -58,7 +61,7 @@ func (p *Plugin) Schema() map[string]goten.TableSchema {
 }
 
 func (p *Plugin) Migrations() fs.FS {
-	sub, _ := fs.Sub(migrationsFS, "migrations")
+	sub, _ := fs.Sub(MigrationsFS, "migrations")
 	return sub
 }
 
