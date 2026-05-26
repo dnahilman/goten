@@ -8,6 +8,14 @@ import (
 	"testing"
 )
 
+// Filenames the embedded sources now ship with after the flat refactor.
+const (
+	coreUpFile    = "20260520120000_core_initial.up.sql"
+	coreDownFile  = "20260520120000_core_initial.down.sql"
+	usernameUp    = "20260520130000_username_add_username.up.sql"
+	usernameDown  = "20260520130000_username_add_username.down.sql"
+)
+
 // chdir switches CWD to dir for the lifetime of the test.
 func chdir(t *testing.T, dir string) {
 	t.Helper()
@@ -39,14 +47,11 @@ func TestRunInit_CoreOnly_FreshProject(t *testing.T) {
 	writeFile(t, dir, "goten.config.yaml", "database:\n  url: postgres://x/db\n")
 
 	var buf bytes.Buffer
-	if err := runInit("goten.config.yaml", "", false, &buf); err != nil {
+	if err := runInit("goten.config.yaml", "", false, true, &buf); err != nil {
 		t.Fatalf("runInit: %v", err)
 	}
 
-	for _, name := range []string{
-		"20260520120000_initial.up.sql",
-		"20260520120000_initial.down.sql",
-	} {
+	for _, name := range []string{coreUpFile, coreDownFile} {
 		got, err := os.ReadFile(filepath.Join(dir, "migrations", name))
 		if err != nil {
 			t.Fatalf("missing %s: %v", name, err)
@@ -64,7 +69,7 @@ func TestRunInit_CoreOnly_FreshProject(t *testing.T) {
 	}
 }
 
-func TestRunInit_CoreAndUsername_Shorthand(t *testing.T) {
+func TestRunInit_CoreAndUsername_FlatLayout(t *testing.T) {
 	dir := t.TempDir()
 	chdir(t, dir)
 	writeFile(t, dir, "goten.config.yaml",
@@ -72,33 +77,18 @@ func TestRunInit_CoreAndUsername_Shorthand(t *testing.T) {
 			"migrations:\n  plugins:\n    - username\n")
 
 	var buf bytes.Buffer
-	if err := runInit("goten.config.yaml", "", false, &buf); err != nil {
+	if err := runInit("goten.config.yaml", "", false, true, &buf); err != nil {
 		t.Fatalf("runInit: %v", err)
 	}
 
-	// Plugin migrations should appear at ./plugins/username/migrations/
-	entries, err := os.ReadDir(filepath.Join(dir, "plugins", "username", "migrations"))
-	if err != nil {
-		t.Fatalf("plugin migrations dir missing: %v", err)
+	// Everything must land in ./migrations/ — no per-plugin subdirs.
+	for _, name := range []string{coreUpFile, coreDownFile, usernameUp, usernameDown} {
+		if _, err := os.Stat(filepath.Join(dir, "migrations", name)); err != nil {
+			t.Errorf("expected %s in flat ./migrations/, got: %v", name, err)
+		}
 	}
-	if len(entries) == 0 {
-		t.Fatal("expected at least one plugin SQL file")
-	}
-}
-
-func TestRunInit_CoreAndUsername_FullPath(t *testing.T) {
-	dir := t.TempDir()
-	chdir(t, dir)
-	writeFile(t, dir, "goten.config.yaml",
-		"database:\n  url: postgres://x/db\n"+
-			"migrations:\n  plugins:\n    - ./plugins/username/migrations\n")
-
-	var buf bytes.Buffer
-	if err := runInit("goten.config.yaml", "", false, &buf); err != nil {
-		t.Fatalf("runInit: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "plugins", "username", "migrations")); err != nil {
-		t.Fatalf("expected plugin dir from explicit path: %v", err)
+	if _, err := os.Stat(filepath.Join(dir, "plugins")); !os.IsNotExist(err) {
+		t.Errorf("./plugins/ must not be created by flat-layout init (got err: %v)", err)
 	}
 }
 
@@ -108,10 +98,10 @@ func TestRunInit_Idempotent(t *testing.T) {
 	writeFile(t, dir, "goten.config.yaml", "database:\n  url: postgres://x/db\n")
 
 	var first, second bytes.Buffer
-	if err := runInit("goten.config.yaml", "", false, &first); err != nil {
+	if err := runInit("goten.config.yaml", "", false, true, &first); err != nil {
 		t.Fatalf("first runInit: %v", err)
 	}
-	if err := runInit("goten.config.yaml", "", false, &second); err != nil {
+	if err := runInit("goten.config.yaml", "", false, true, &second); err != nil {
 		t.Fatalf("second runInit: %v", err)
 	}
 	if !strings.Contains(second.String(), "0 written") {
@@ -123,18 +113,16 @@ func TestRunInit_ConflictWithoutForce(t *testing.T) {
 	dir := t.TempDir()
 	chdir(t, dir)
 	writeFile(t, dir, "goten.config.yaml", "database:\n  url: postgres://x/db\n")
-	writeFile(t, dir, "migrations/20260520120000_initial.up.sql", "-- my custom content\n")
+	writeFile(t, dir, "migrations/"+coreUpFile, "-- my custom content\n")
 
-	err := runInit("goten.config.yaml", "", false, &bytes.Buffer{})
+	err := runInit("goten.config.yaml", "", false, true, &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("expected error when destination has different content")
 	}
 	if !strings.Contains(err.Error(), "--force") {
 		t.Errorf("error should mention --force, got: %v", err)
 	}
-
-	// Original file must be untouched.
-	got, _ := os.ReadFile(filepath.Join(dir, "migrations/20260520120000_initial.up.sql"))
+	got, _ := os.ReadFile(filepath.Join(dir, "migrations", coreUpFile))
 	if string(got) != "-- my custom content\n" {
 		t.Errorf("original file was modified: %q", got)
 	}
@@ -144,14 +132,13 @@ func TestRunInit_ConflictWithForce(t *testing.T) {
 	dir := t.TempDir()
 	chdir(t, dir)
 	writeFile(t, dir, "goten.config.yaml", "database:\n  url: postgres://x/db\n")
-	writeFile(t, dir, "migrations/20260520120000_initial.up.sql", "-- my custom content\n")
+	writeFile(t, dir, "migrations/"+coreUpFile, "-- my custom content\n")
 
-	if err := runInit("goten.config.yaml", "", true, &bytes.Buffer{}); err != nil {
+	if err := runInit("goten.config.yaml", "", true, true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runInit with --force: %v", err)
 	}
-
-	got, _ := os.ReadFile(filepath.Join(dir, "migrations/20260520120000_initial.up.sql"))
-	want, _ := coreSource.ReadFile("migrations/20260520120000_initial.up.sql")
+	got, _ := os.ReadFile(filepath.Join(dir, "migrations", coreUpFile))
+	want, _ := coreSource.ReadFile("migrations/" + coreUpFile)
 	if !bytes.Equal(got, want) {
 		t.Error("--force should overwrite to match embedded source")
 	}
@@ -164,7 +151,7 @@ func TestRunInit_UnknownPlugin(t *testing.T) {
 		"database:\n  url: postgres://x/db\n"+
 			"migrations:\n  plugins:\n    - magiclink\n")
 
-	err := runInit("goten.config.yaml", "", false, &bytes.Buffer{})
+	err := runInit("goten.config.yaml", "", false, true, &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("expected error for unknown plugin")
 	}
@@ -179,27 +166,11 @@ func TestRunInit_UnknownPlugin(t *testing.T) {
 func TestRunInit_NoConfigFile_FreshBootstrap(t *testing.T) {
 	dir := t.TempDir()
 	chdir(t, dir)
-	// No goten.config.yaml exists — init should use synthetic defaults.
 
-	if err := runInit("goten.config.yaml", "", false, &bytes.Buffer{}); err != nil {
+	if err := runInit("goten.config.yaml", "", false, true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runInit without config: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "migrations/20260520120000_initial.up.sql")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "migrations", coreUpFile)); err != nil {
 		t.Fatalf("core file missing after bootstrap-no-config init: %v", err)
-	}
-}
-
-func TestResolvePluginEntry(t *testing.T) {
-	tests := []struct{ entry, wantName, wantDir string }{
-		{"username", "username", filepath.Join(".", "plugins", "username", "migrations")},
-		{"./plugins/username/migrations", "username", "./plugins/username/migrations"},
-		{"./custom/myauth/migrations", "myauth", "./custom/myauth/migrations"},
-	}
-	for _, tt := range tests {
-		gotName, gotDir := resolvePluginEntry(tt.entry)
-		if gotName != tt.wantName || gotDir != tt.wantDir {
-			t.Errorf("resolvePluginEntry(%q) = (%q, %q), want (%q, %q)",
-				tt.entry, gotName, gotDir, tt.wantName, tt.wantDir)
-		}
 	}
 }

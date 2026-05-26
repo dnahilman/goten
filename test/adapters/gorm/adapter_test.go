@@ -29,7 +29,7 @@ func setupDB(t *testing.T) (*gormadapter.Adapter, func()) {
 	`).Error)
 
 	// Apply migration
-	sql, err := os.ReadFile("../../../migrations/20260520120000_initial.up.sql")
+	sql, err := os.ReadFile("../../../migrations/20260520120000_core_initial.up.sql")
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(string(sql)).Error)
 

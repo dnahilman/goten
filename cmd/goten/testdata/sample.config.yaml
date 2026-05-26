@@ -5,7 +5,7 @@ database:
 migrations:
   core_dir: ./migrations
   plugins:
-    - ./plugins/username/migrations
+    - username
   table: goten_migrations
 
 generate_dir: ./migrations

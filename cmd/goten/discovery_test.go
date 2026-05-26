@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -84,7 +86,7 @@ func TestSanitizeName(t *testing.T) {
 }
 
 func TestWalkDir_FiltersNonUpSQL(t *testing.T) {
-	migs, err := walkDir("testdata/migrations", "core")
+	migs, err := walkDir("testdata/migrations")
 	if err != nil {
 		t.Fatalf("walkDir: %v", err)
 	}
@@ -92,5 +94,30 @@ func TestWalkDir_FiltersNonUpSQL(t *testing.T) {
 		if m.UpPath == "" {
 			t.Error("migration has empty UpPath")
 		}
+	}
+}
+
+func TestWalkDir_SkipsUnprefixedFilenames(t *testing.T) {
+	// Files that don't match <ts>_<plugin>_<name>.up.sql must be ignored
+	// (no fallback to the legacy <ts>_<name>.up.sql shape).
+	dir := t.TempDir()
+	for _, name := range []string{
+		"20260101000000_legacy.up.sql",
+		"20260101000000_core_ok.up.sql",
+		"not_a_migration.up.sql",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("-- noop\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	migs, err := walkDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(migs) != 1 || migs[0].Name != "ok" {
+		t.Fatalf("expected only the well-formed file to be picked up, got %+v", migs)
+	}
+	if migs[0].Plugin != "core" {
+		t.Errorf("expected plugin=core, got %q", migs[0].Plugin)
 	}
 }
