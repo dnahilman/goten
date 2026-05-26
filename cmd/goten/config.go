@@ -12,6 +12,11 @@ import (
 )
 
 type Config struct {
+	// EnvFile points to a .env file loaded before YAML interpolation.
+	// May not itself reference ${VAR}, since env hasn't been loaded yet when it's read.
+	// CLI flag --env-file overrides this; both override the default lookup of ".env" in CWD.
+	EnvFile string `yaml:"env_file"`
+
 	Database struct {
 		URL    string `yaml:"url"`
 		Driver string `yaml:"driver"`
@@ -56,14 +61,31 @@ func loadDotenv(explicit string) error {
 	return nil
 }
 
-func loadConfig(path, envFile string) (*Config, error) {
-	if err := loadDotenv(envFile); err != nil {
-		return nil, err
-	}
+func loadConfig(path, envFileFlag string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config %q: %w (create a goten.config.yaml or use --config)", path, err)
 	}
+
+	// Pre-pass: extract env_file from the raw YAML so we can populate the
+	// environment before ${VAR} interpolation runs on the full document.
+	// The pre-pass intentionally has no expansion — env_file itself cannot use ${VAR}.
+	var pre struct {
+		EnvFile string `yaml:"env_file"`
+	}
+	if err := yaml.Unmarshal(data, &pre); err != nil {
+		return nil, fmt.Errorf("parse config: %w", err)
+	}
+
+	// Precedence: --env-file flag > env_file in YAML > default ".env" in CWD.
+	envFile := envFileFlag
+	if envFile == "" {
+		envFile = pre.EnvFile
+	}
+	if err := loadDotenv(envFile); err != nil {
+		return nil, err
+	}
+
 	data = []byte(expandEnv(string(data)))
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {

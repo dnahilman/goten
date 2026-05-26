@@ -219,6 +219,64 @@ func TestLoadConfig_DotenvCWDMissingNoError(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_EnvFileFromYAML(t *testing.T) {
+	dir := t.TempDir()
+	envPath := dir + "/staging.env"
+	if err := os.WriteFile(envPath, []byte("YAML_ENV_URL=postgres://from-yaml-env-file@host/db\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfgPath := dir + "/c.yaml"
+	cfgBody := "env_file: " + envPath + "\ndatabase:\n  url: ${YAML_ENV_URL}\n"
+	if err := os.WriteFile(cfgPath, []byte(cfgBody), 0644); err != nil {
+		t.Fatal(err)
+	}
+	os.Unsetenv("YAML_ENV_URL")
+	t.Cleanup(func() { os.Unsetenv("YAML_ENV_URL") })
+
+	cfg, err := loadConfig(cfgPath, "")
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	if cfg.Database.URL != "postgres://from-yaml-env-file@host/db" {
+		t.Errorf("expected env_file from YAML to be loaded, got: %s", cfg.Database.URL)
+	}
+}
+
+func TestLoadConfig_EnvFileFlagOverridesYAML(t *testing.T) {
+	dir := t.TempDir()
+	yamlEnv := dir + "/yaml.env"
+	flagEnv := dir + "/flag.env"
+	_ = os.WriteFile(yamlEnv, []byte("PRECEDENCE_URL=from-yaml\n"), 0644)
+	_ = os.WriteFile(flagEnv, []byte("PRECEDENCE_URL=from-flag\n"), 0644)
+
+	cfgPath := dir + "/c.yaml"
+	cfgBody := "env_file: " + yamlEnv + "\ndatabase:\n  url: postgres://x/${PRECEDENCE_URL}\n"
+	_ = os.WriteFile(cfgPath, []byte(cfgBody), 0644)
+
+	os.Unsetenv("PRECEDENCE_URL")
+	t.Cleanup(func() { os.Unsetenv("PRECEDENCE_URL") })
+
+	cfg, err := loadConfig(cfgPath, flagEnv)
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	if cfg.Database.URL != "postgres://x/from-flag" {
+		t.Errorf("--env-file flag must win over YAML env_file, got: %s", cfg.Database.URL)
+	}
+}
+
+func TestLoadConfig_EnvFileFromYAMLMissing(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := dir + "/c.yaml"
+	cfgBody := "env_file: " + dir + "/missing.env\ndatabase:\n  url: postgres://x/db\n"
+	_ = os.WriteFile(cfgPath, []byte(cfgBody), 0644)
+
+	_, err := loadConfig(cfgPath, "")
+	if err == nil {
+		t.Fatal("expected error when env_file points to a missing file")
+	}
+}
+
 func TestLoadConfig_DotenvDoesNotOverrideExistingEnv(t *testing.T) {
 	dir := t.TempDir()
 	_ = os.WriteFile(dir+"/.env", []byte("EXISTING_VAR=from-file\n"), 0644)
