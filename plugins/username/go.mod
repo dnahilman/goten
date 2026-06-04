@@ -3,7 +3,7 @@ module github.com/dnahilman/goten/plugins/username
 go 1.25.0
 
 require (
-	github.com/dnahilman/goten v0.0.0
+	github.com/dnahilman/goten v0.2.0
 	github.com/go-playground/validator/v10 v10.30.3
 )
 
@@ -17,5 +17,3 @@ require (
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 )
-
-replace github.com/dnahilman/goten => ../..
