@@ -3,7 +3,17 @@
 All notable changes are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [0.2.0] - 2026-06-04
+
+### Added (this release)
+
+- **Google OAuth plugin** (`github.com/dnahilman/goten/plugins/oauth`) — Authorization Code +
+  PKCE (S256) + OIDC, verification-table state, plaintext-opt-in token storage, account linking
+  (`trustedProviders` / `requireLocalEmailVerified`), stdlib RS256/JWKS verification. New module,
+  first tagged at `v0.2.0`.
+- **First GitHub-consumable release.** Submodules now pin a real `github.com/dnahilman/goten`
+  version instead of the workspace-only `v0.0.0` + relative `replace`, so `adapters/gorm`,
+  `plugins/username`, `plugins/oauth`, and `cmd/goten` resolve from `go get`.
 
 ### Changed (breaking, pre-v1)
 

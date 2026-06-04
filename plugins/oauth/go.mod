@@ -2,7 +2,7 @@ module github.com/dnahilman/goten/plugins/oauth
 
 go 1.25.0
 
-require github.com/dnahilman/goten v0.0.0
+require github.com/dnahilman/goten v0.2.0
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
@@ -15,5 +15,3 @@ require (
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 )
-
-replace github.com/dnahilman/goten => ../..

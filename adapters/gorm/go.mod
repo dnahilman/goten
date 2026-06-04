@@ -3,7 +3,7 @@ module github.com/dnahilman/goten/adapters/gorm
 go 1.25.0
 
 require (
-	github.com/dnahilman/goten v0.0.0
+	github.com/dnahilman/goten v0.2.0
 	gorm.io/gorm v1.25.12
 )
 
@@ -12,5 +12,3 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	golang.org/x/text v0.37.0 // indirect
 )
-
-replace github.com/dnahilman/goten => ../..
