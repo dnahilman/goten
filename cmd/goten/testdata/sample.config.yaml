@@ -1,11 +1,7 @@
-database:
-  url: postgres://goten:goten@localhost:5432/goten?sslmode=disable
-  driver: postgres
-
-migrations:
-  core_dir: ./migrations
-  plugins:
-    - username
-  table: goten_migrations
-
-generate_dir: ./migrations
+plugins:
+  - username
+  - oauth
+generate:
+  output_dir: ./internal/auth
+  package: authmodels
+  orm: gorm

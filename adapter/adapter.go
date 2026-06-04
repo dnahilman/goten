@@ -27,6 +27,15 @@ type Adapter interface {
 	Count(ctx context.Context, model string, q Query) (int64, error)
 }
 
+// TxRunner is an optional capability: adapters that support database transactions
+// implement it. fn runs with a context carrying the active transaction; all
+// Adapter calls made with that context participate in the same transaction, and
+// returning a non-nil error (or panicking) rolls it back. Adapters that don't
+// implement TxRunner simply run without transactional guarantees.
+type TxRunner interface {
+	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
 func EQ(field string, value any) Where {
 	return Where{Field: field, Operator: "=", Value: value}
 }

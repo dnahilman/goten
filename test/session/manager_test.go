@@ -121,6 +121,12 @@ func TestManager_Validate_SlidingRefresh(t *testing.T) {
 
 	assert.True(t, refreshed.ExpiresAt.After(original) || refreshed.ExpiresAt.Equal(original),
 		"expires_at should be extended after sliding refresh")
+	// Sliding refresh EXTENDS the session; it does not ROTATE the token. The
+	// same token must keep working (there is no session refresh-token concept).
+	assert.Equal(t, sess.Token, refreshed.Token, "session token must not rotate on refresh")
+	again, err := m.Validate(ctx, sess.Token)
+	require.NoError(t, err, "original token must remain valid after a sliding refresh")
+	require.NotNil(t, again)
 }
 
 func TestManager_Validate_Valid(t *testing.T) {

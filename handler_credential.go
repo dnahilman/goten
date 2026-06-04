@@ -1,13 +1,15 @@
 package goten
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/dnahilman/goten/crypto"
 	"github.com/dnahilman/goten/internal"
 	"github.com/dnahilman/goten/internal/httputil"
-	"github.com/dnahilman/goten/internal/validate"
+	"github.com/dnahilman/goten/models"
 	"github.com/dnahilman/goten/session"
 )
 
@@ -31,17 +33,14 @@ func (a *Auth) handleSignUpEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
-	if !validate.IsValidEmail(req.Email) {
+	if err := validate.Var(req.Email, "required,email"); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "INVALID_EMAIL", "invalid email")
 		return
 	}
 	ep := a.cfg.EmailPassword
-	if err := validate.Password(req.Password, ep.MinPasswordLength, ep.MaxPasswordLength); err != nil {
-		if len(req.Password) < ep.MinPasswordLength {
-			httputil.WriteError(w, http.StatusBadRequest, "PASSWORD_TOO_SHORT", err.Error())
-		} else {
-			httputil.WriteError(w, http.StatusBadRequest, "PASSWORD_TOO_LONG", err.Error())
-		}
+	if err := validate.Var(req.Password, fmt.Sprintf("required,min=%d,max=%d", ep.MinPasswordLength, ep.MaxPasswordLength)); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, passwordCode(err),
+			fmt.Sprintf("password must be %d-%d characters", ep.MinPasswordLength, ep.MaxPasswordLength))
 		return
 	}
 
@@ -63,14 +62,21 @@ func (a *Auth) handleSignUpEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	extra := a.RunUserCreateHooks(map[string]any{})
-	user, err := a.ia.CreateUserWithExtra(ctx, req.Email, req.Name, false, extra)
+	var user *models.User
+	err = a.ia.WithTransaction(ctx, func(txCtx context.Context) error {
+		u, err := a.ia.CreateUserWithExtra(txCtx, req.Email, req.Name, false, extra)
+		if err != nil {
+			return err
+		}
+		if _, err := a.ia.CreateAccount(txCtx, u.ID, u.ID, "credential", map[string]any{
+			"password": hash,
+		}); err != nil {
+			return err
+		}
+		user = u
+		return nil
+	})
 	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL", "internal error")
-		return
-	}
-	if _, err = a.ia.CreateAccount(ctx, user.ID, user.ID, "credential", map[string]any{
-		"password": hash,
-	}); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL", "internal error")
 		return
 	}

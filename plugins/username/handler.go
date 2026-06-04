@@ -1,6 +1,7 @@
 package usernameplugin
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -29,12 +30,12 @@ func (p *Plugin) handleSignUp(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Username = strings.TrimSpace(req.Username)
 
-	if !p.opts.Regex.MatchString(req.Username) {
+	if err := p.validate.Var(req.Username, "required,username"); err != nil {
 		goten.WriteError(w, http.StatusBadRequest, "INVALID_USERNAME",
-			"username must be "+p.opts.Regex.String())
+			"username must match "+p.opts.Regex.String())
 		return
 	}
-	if len(req.Password) < 8 || len(req.Password) > 72 {
+	if err := p.validate.Var(req.Password, "required,min=8,max=72"); err != nil {
 		goten.WriteError(w, http.StatusBadRequest, "INVALID_PASSWORD", "password must be 8-72 characters")
 		return
 	}
@@ -64,17 +65,23 @@ func (p *Plugin) handleSignUp(w http.ResponseWriter, r *http.Request) {
 	// We use a reserved TLD (.invalid per RFC 6761) to avoid conflicts.
 	syntheticEmail := req.Username + "@username.local.invalid"
 
-	user, err := ia.CreateUserWithExtra(ctx, syntheticEmail, req.Name, false, map[string]any{
-		"username": req.Username,
+	var user *goten.User
+	err = ia.WithTransaction(ctx, func(txCtx context.Context) error {
+		u, err := ia.CreateUserWithExtra(txCtx, syntheticEmail, req.Name, false, map[string]any{
+			"username": req.Username,
+		})
+		if err != nil {
+			return err
+		}
+		if _, err := ia.CreateAccount(txCtx, u.ID, u.ID, "credential", map[string]any{
+			"password": hash,
+		}); err != nil {
+			return err
+		}
+		user = u
+		return nil
 	})
 	if err != nil {
-		goten.WriteError(w, http.StatusInternalServerError, "INTERNAL", "internal error")
-		return
-	}
-
-	if _, err = ia.CreateAccount(ctx, user.ID, user.ID, "credential", map[string]any{
-		"password": hash,
-	}); err != nil {
 		goten.WriteError(w, http.StatusInternalServerError, "INTERNAL", "internal error")
 		return
 	}

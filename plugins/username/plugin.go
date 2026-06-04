@@ -1,18 +1,11 @@
 package usernameplugin
 
 import (
-	"embed"
-	"io/fs"
 	"regexp"
 
 	goten "github.com/dnahilman/goten"
+	"github.com/go-playground/validator/v10"
 )
-
-// MigrationsFS holds the username plugin's schema migrations.
-// Exposed so the `goten init` CLI command can copy them into a user's project.
-//
-//go:embed migrations/*.sql
-var MigrationsFS embed.FS
 
 var defaultUsernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,32}$`)
 
@@ -28,8 +21,9 @@ type Options struct {
 
 // Plugin implements the username authentication plugin.
 type Plugin struct {
-	opts Options
-	auth *goten.Auth
+	opts     Options
+	auth     *goten.Auth
+	validate *validator.Validate
 }
 
 // New creates a new username plugin with the given options.
@@ -43,7 +37,12 @@ func New(opts Options) *Plugin {
 	if opts.MaxLength == 0 {
 		opts.MaxLength = 32
 	}
-	return &Plugin{opts: opts}
+	v := validator.New(validator.WithRequiredStructEnabled())
+	// "username" applies the (configurable) username regex.
+	_ = v.RegisterValidation("username", func(fl validator.FieldLevel) bool {
+		return opts.Regex.MatchString(fl.Field().String())
+	})
+	return &Plugin{opts: opts, validate: v}
 }
 
 func (p *Plugin) ID() string { return "username" }
@@ -60,11 +59,6 @@ func (p *Plugin) Schema() map[string]goten.TableSchema {
 	}
 }
 
-func (p *Plugin) Migrations() fs.FS {
-	sub, _ := fs.Sub(MigrationsFS, "migrations")
-	return sub
-}
-
 func (p *Plugin) Endpoints() []goten.Endpoint {
 	return []goten.Endpoint{
 		{Method: "POST", Path: "/sign-up/username", Handler: p.handleSignUp},
@@ -74,9 +68,8 @@ func (p *Plugin) Endpoints() []goten.Endpoint {
 
 // Compile-time interface checks.
 var (
-	_ goten.Plugin            = (*Plugin)(nil)
-	_ goten.AuthAware         = (*Plugin)(nil)
-	_ goten.SchemaProvider    = (*Plugin)(nil)
-	_ goten.MigrationProvider = (*Plugin)(nil)
-	_ goten.EndpointProvider  = (*Plugin)(nil)
+	_ goten.Plugin           = (*Plugin)(nil)
+	_ goten.AuthAware        = (*Plugin)(nil)
+	_ goten.SchemaProvider   = (*Plugin)(nil)
+	_ goten.EndpointProvider = (*Plugin)(nil)
 )

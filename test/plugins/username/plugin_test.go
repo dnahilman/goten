@@ -24,20 +24,6 @@ func TestPlugin_Schema(t *testing.T) {
 	assert.True(t, users.Fields[0].Unique)
 }
 
-func TestPlugin_Migrations(t *testing.T) {
-	p := usernameplugin.New(usernameplugin.Options{})
-	fsys := p.Migrations()
-	require.NotNil(t, fsys)
-
-	up, err := fsys.Open("20260520130000_username_add_username.up.sql")
-	require.NoError(t, err, "up migration file should exist")
-	up.Close()
-
-	down, err := fsys.Open("20260520130000_username_add_username.down.sql")
-	require.NoError(t, err, "down migration file should exist")
-	down.Close()
-}
-
 func TestPlugin_Endpoints(t *testing.T) {
 	p := usernameplugin.New(usernameplugin.Options{})
 	endpoints := p.Endpoints()

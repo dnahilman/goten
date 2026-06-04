@@ -1,29 +1,28 @@
 package main
 
 import (
-	"embed"
 	"sort"
 
 	goten "github.com/dnahilman/goten"
+	oauthplugin "github.com/dnahilman/goten/plugins/oauth"
 	usernameplugin "github.com/dnahilman/goten/plugins/username"
 )
 
-// coreSource holds the core migrations the CLI ships with.
-var coreSource embed.FS = goten.CoreMigrationsFS
-
-// pluginSource maps a plugin shorthand name to its embedded migrations FS.
-// Every official plugin must register here to be reachable from `goten init`.
-// Third-party plugins are not supported by the official CLI — users with
-// custom plugins must copy migration files manually or build a custom CLI.
-var pluginSource = map[string]embed.FS{
-	"username": usernameplugin.MigrationsFS,
+// pluginRegistry maps a plugin shorthand name to a SchemaProvider, used by
+// `goten generate` to collect the columns each plugin contributes. Plugins are
+// instantiated with zero-value options because Schema() is static (it does not
+// depend on option values).
+//
+// Every official plugin must register here to be reachable from `goten generate`.
+var pluginRegistry = map[string]goten.SchemaProvider{
+	"username": usernameplugin.New(usernameplugin.Options{}),
+	"oauth":    oauthplugin.New(oauthplugin.Options{}),
 }
 
-// availablePluginNames returns the registered plugin shorthand names, sorted,
-// for use in error messages.
+// availablePluginNames returns the registered plugin shorthand names, sorted.
 func availablePluginNames() []string {
-	names := make([]string, 0, len(pluginSource))
-	for n := range pluginSource {
+	names := make([]string, 0, len(pluginRegistry))
+	for n := range pluginRegistry {
 		names = append(names, n)
 	}
 	sort.Strings(names)

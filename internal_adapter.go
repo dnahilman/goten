@@ -22,6 +22,17 @@ func NewInternalAdapter(a adp.Adapter) *InternalAdapter {
 // Adapter returns the raw underlying adapter for plugins that need direct access.
 func (ia *InternalAdapter) Adapter() adp.Adapter { return ia.adapter }
 
+// WithTransaction runs fn inside a database transaction when the underlying
+// adapter supports it (adp.TxRunner); otherwise fn runs directly (best-effort,
+// e.g. for in-memory test adapters). Calls made with the context passed to fn
+// participate in the same transaction.
+func (ia *InternalAdapter) WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
+	if tr, ok := ia.adapter.(adp.TxRunner); ok {
+		return tr.WithTransaction(ctx, fn)
+	}
+	return fn(ctx)
+}
+
 // --- Users ---
 
 func (ia *InternalAdapter) CreateUser(ctx context.Context, email, name string, emailVerified bool) (*models.User, error) {
@@ -148,6 +159,44 @@ func (ia *InternalAdapter) UpdatePassword(ctx context.Context, userID, hashedPas
 	return err
 }
 
+// --- Verification ---
+
+// CreateVerificationValue stores a key-value record with an expiry, keyed by identifier.
+// Used by the OAuth plugin to persist sign-in state.
+func (ia *InternalAdapter) CreateVerificationValue(ctx context.Context, identifier, value string, expiresAt time.Time) (*models.Verification, error) {
+	now := time.Now().UTC()
+	data := map[string]any{
+		"id":         crypto.NewID(),
+		"identifier": identifier,
+		"value":      value,
+		"expires_at": expiresAt,
+		"created_at": now,
+		"updated_at": now,
+	}
+	rec, err := ia.adapter.Create(ctx, "verification", data)
+	if err != nil {
+		return nil, fmt.Errorf("creating verification: %w", err)
+	}
+	return recordToVerification(rec), nil
+}
+
+// FindVerificationValue returns the verification record for the given identifier, or nil.
+func (ia *InternalAdapter) FindVerificationValue(ctx context.Context, identifier string) (*models.Verification, error) {
+	rec, err := ia.adapter.FindOne(ctx, "verification", adp.Query{Where: []adp.Where{adp.EQ("identifier", identifier)}})
+	if err != nil {
+		return nil, err
+	}
+	if rec == nil {
+		return nil, nil
+	}
+	return recordToVerification(rec), nil
+}
+
+// DeleteVerificationByIdentifier removes all verification records for the identifier.
+func (ia *InternalAdapter) DeleteVerificationByIdentifier(ctx context.Context, identifier string) error {
+	return ia.adapter.Delete(ctx, "verification", adp.Query{Where: []adp.Where{adp.EQ("identifier", identifier)}})
+}
+
 // --- Record converters ---
 
 func recordToUser(r map[string]any) *models.User {
@@ -184,4 +233,21 @@ func recordToAccount(r map[string]any) *models.Account {
 		a.UpdatedAt = v
 	}
 	return a
+}
+
+func recordToVerification(r map[string]any) *models.Verification {
+	v := &models.Verification{}
+	v.ID, _ = r["id"].(string)
+	v.Identifier, _ = r["identifier"].(string)
+	v.Value, _ = r["value"].(string)
+	if t, ok := r["expires_at"].(time.Time); ok {
+		v.ExpiresAt = t
+	}
+	if t, ok := r["created_at"].(time.Time); ok {
+		v.CreatedAt = t
+	}
+	if t, ok := r["updated_at"].(time.Time); ok {
+		v.UpdatedAt = t
+	}
+	return v
 }

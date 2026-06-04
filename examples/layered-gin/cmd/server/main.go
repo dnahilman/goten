@@ -16,6 +16,7 @@ import (
 
 	goten "github.com/dnahilman/goten"
 	gormadapter "github.com/dnahilman/goten/adapters/gorm"
+	authmodels "github.com/dnahilman/goten/examples/layered-gin/internal/auth"
 	usernameplugin "github.com/dnahilman/goten/plugins/username"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
@@ -45,10 +46,10 @@ func main() {
 		log.Fatal("connect db: ", err)
 	}
 
-	// Domain table — quick AutoMigrate during dev. For production, replace
-	// with a versioned SQL file in ./migrations/ (e.g. via Atlas) and apply
-	// via `goten migrate up`.
-	if err := db.AutoMigrate(&model.UserProfile{}); err != nil {
+	// Goten's auth tables come from generated models (`goten generate`); the
+	// domain table (UserProfile) is app-owned. AutoMigrate both during dev.
+	models := append(authmodels.AllModels(), &model.UserProfile{})
+	if err := db.AutoMigrate(models...); err != nil {
 		log.Fatal("automigrate: ", err)
 	}
 

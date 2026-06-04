@@ -2,67 +2,42 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/dnahilman/goten/main/goten.config.schema.json",
   "title": "Goten CLI Configuration",
-  "description": "Configuration file for the goten CLI tool. Drives `goten init`, `goten migrate up/down/status/generate`, and .env loading.",
+  "description": "Configuration for the goten CLI. Drives `goten generate`, which emits ORM model definitions (e.g. GORM structs) from the core schema plus the active plugins' schema. Apply them with your ORM (e.g. db.AutoMigrate(authmodels.AllModels()...)).",
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "env_file": {
-      "type": "string",
-      "description": "Path to a .env file loaded before YAML interpolation. Cannot itself use ${VAR} (env not yet loaded when this field is read). Missing file is a fatal error.",
-      "examples": [".env", "./config/.env.staging"]
+    "plugins": {
+      "type": "array",
+      "description": "Active plugin shorthand names whose schema is merged into the generated models. Each name must be registered with the CLI (run `goten generate` with an unknown name to see the available list).",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "examples": ["username", "oauth"]
+      },
+      "default": []
     },
-    "database": {
+    "generate": {
       "type": "object",
-      "description": "Database connection used by goten migrate commands.",
-      "additionalProperties": false,
-      "required": ["url"],
-      "properties": {
-        "url": {
-          "type": "string",
-          "description": "Database DSN. Supports ${VAR} interpolation against the process environment (and any values loaded from env_file).",
-          "examples": [
-            "postgres://user:pass@localhost:5432/mydb?sslmode=disable",
-            "${DATABASE_URL}"
-          ]
-        },
-        "driver": {
-          "type": "string",
-          "enum": ["postgres"],
-          "default": "postgres",
-          "description": "Database driver. Only postgres is supported in v0.1."
-        }
-      }
-    },
-    "migrations": {
-      "type": "object",
-      "description": "Migration discovery and bootstrap settings.",
+      "description": "Code-generation output settings.",
       "additionalProperties": false,
       "properties": {
-        "core_dir": {
+        "output_dir": {
           "type": "string",
-          "default": "./migrations",
-          "description": "Directory holding core migration SQL files. `goten init` writes here; `goten migrate up/down/status` reads from here."
+          "default": "./internal/auth",
+          "description": "Directory the generated model file (auth_models.go) is written to."
         },
-        "plugins": {
-          "type": "array",
-          "description": "Plugin shorthand names that `goten init` should scaffold into the flat migrations directory. Each name must be registered with the CLI (run `goten init` with an unknown name to see the available list).",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*$",
-            "examples": ["username"]
-          },
-          "default": []
-        },
-        "table": {
+        "package": {
           "type": "string",
-          "default": "goten_migrations",
-          "description": "Tracking table name for applied migrations."
+          "default": "authmodels",
+          "description": "Go package name for the generated file."
+        },
+        "orm": {
+          "type": "string",
+          "enum": ["gorm"],
+          "default": "gorm",
+          "description": "Target ORM generator. Only gorm is supported currently."
         }
       }
-    },
-    "generate_dir": {
-      "type": "string",
-      "description": "Where `goten migrate generate <name>` writes new migration template files. Defaults to migrations.core_dir."
     }
   }
 }

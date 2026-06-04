@@ -18,7 +18,7 @@ Goten is a modular authentication library for Go with a **multi-module plugin ar
 | ✅ Opaque session tokens (`g10_` prefix) | ✅ Username plugin |
 | ✅ Cookie + Bearer auth | ✅ CLI migration tool |
 | ✅ GORM adapter (Postgres) | ✅ CSRF origin check |
-| ✅ Anti-enumeration on sign-in | 🔜 OAuth (Google, GitHub, …) |
+| ✅ Anti-enumeration on sign-in | ✅ OAuth plugin — Sign in with Google (PKCE + OIDC) |
 | ✅ Session list/revoke | 🔜 Magic link, 2FA, JWT plugin |
 
 ## Quick Start
@@ -33,6 +33,7 @@ For a full walkthrough — database setup, migrations, runnable example, and end
 Runnable examples in the repo:
 - [`examples/basic/`](examples/basic/) — minimal `net/http` server.
 - [`examples/layered-gin/`](examples/layered-gin/) — Gin + GORM + layered architecture (`handler → service → repository`).
+- [`examples/oauth-google/`](examples/oauth-google/) — Sign in with Google (OAuth plugin).
 
 ## Endpoints
 
@@ -46,35 +47,55 @@ Runnable examples in the repo:
 | `POST` | `/api/auth/revoke-session` | Revoke a specific session |
 | `POST` | `/api/auth/revoke-other-sessions` | Revoke all other sessions |
 
+With the **OAuth plugin** enabled:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/auth/sign-in/social` | Start social sign-in → `{redirect, url}` (or sign in with an `idToken`) |
+| `GET`  | `/api/auth/callback/{provider}` | OAuth redirect callback |
+| `GET`  | `/api/auth/list-accounts` | List the user's linked accounts |
+| `POST` | `/api/auth/link-social` | Link a provider to the current user |
+| `POST` | `/api/auth/unlink-account` | Unlink a provider |
+| `POST` | `/api/auth/get-access-token` | Get a valid provider access token |
+| `POST` | `/api/auth/refresh-token` | Refresh the stored provider tokens |
+
 ## CLI
+
+The CLI is **generate-only** (like better-auth's `generate`): it emits ORM model
+definitions from the core schema plus the active plugins' schema. You apply them with
+your ORM — for GORM, `db.AutoMigrate(authmodels.AllModels()...)`.
 
 ```bash
 go install github.com/dnahilman/goten/cmd/goten@latest
 
-# Apply migrations (core + plugins)
-goten migrate up
-
-# Status
-goten migrate status
-
-# Roll back last migration
-goten migrate down
-
-# Generate new migration file
-goten migrate generate add_phone_number
+# Generate models into <generate.output_dir>/auth_models.go
+goten generate
 ```
 
 Config file `goten.config.yaml`:
 
 ```yaml
-database:
-  url: postgres://user:pass@localhost:5432/mydb?sslmode=disable
+plugins:
+  - username
+  - oauth          # adds the verification table + account token columns to the models
 
-migrations:
-  plugins:
-    - username
-  table: goten_migrations
+generate:
+  output_dir: ./internal/auth
+  package: authmodels
+  orm: gorm
 ```
+
+Then wire it into your app:
+
+```go
+import authmodels "yourapp/internal/auth"
+
+db.AutoMigrate(authmodels.AllModels()...) // create/upgrade goten's tables
+```
+
+> `AutoMigrate` is **additive** (creates tables, adds columns/indexes/constraints). It does
+> not drop/rename columns, change types destructively, or roll back. Destructive changes and
+> data migrations are handled with your own SQL tooling.
 
 **Editor autocomplete:** add `# yaml-language-server: $schema=https://raw.githubusercontent.com/dnahilman/goten/main/goten.config.schema.json` as the first line of your `goten.config.yaml` for autocomplete + inline validation in VS Code (Red Hat YAML extension), JetBrains, and other editors. See [`examples/basic/goten.config.yaml`](examples/basic/goten.config.yaml).
 
@@ -101,6 +122,49 @@ auth, _ := goten.New(goten.Config{
 
 Adds endpoints: `POST /api/auth/sign-up/username`, `POST /api/auth/sign-in/username`.
 
+### OAuth Plugin (Sign in with Google)
+
+Social sign-in via OAuth 2.0 Authorization Code + PKCE + OIDC, modeled after better-auth.
+Providers are registered in a map (like better-auth's `socialProviders`); Google is built in.
+
+```bash
+go get github.com/dnahilman/goten/plugins/oauth
+```
+
+```go
+import (
+    oauthplugin "github.com/dnahilman/goten/plugins/oauth"
+    "github.com/dnahilman/goten/plugins/oauth/providers"
+)
+
+auth, _ := goten.New(goten.Config{
+    BaseURL:        "http://localhost:8080",
+    TrustedOrigins: []string{"http://localhost:3000"}, // allowed callbackURL origins
+    // ...
+    Plugins: []goten.Plugin{
+        oauthplugin.New(oauthplugin.Options{
+            Providers: map[string]oauthplugin.Provider{
+                "google": providers.Google(providers.GoogleOptions{
+                    ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+                    ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+                    AccessType:   "offline", // request a refresh token
+                }),
+            },
+            // EncryptOAuthTokens: true, // opt-in AES-256-GCM token encryption (default off)
+        }),
+    },
+})
+```
+
+Then add `oauth` to `plugins` in `goten.config.yaml`, run `goten generate`, and `AutoMigrate`
+the result. The generated models gain a core `verification` table (which stores the OAuth
+sign-in state) plus token columns on `accounts`.
+
+Security: PKCE (S256), CSRF state (verification row + signed cookie), redirect-origin
+validation, and anti account-takeover linking (an existing user is auto-linked only when the
+provider's email is verified and, by default, the local account is verified too). Full
+walkthrough — including Google Cloud Console setup — in [`examples/oauth-google/`](examples/oauth-google/).
+
 ### Building Your Own Plugin
 
 ```go
@@ -115,7 +179,7 @@ func (p *MyPlugin) Endpoints() []goten.Endpoint {
 }
 ```
 
-Optional interfaces: `Initializer`, `EndpointProvider`, `SchemaProvider`, `MigrationProvider`, `UserCreateHookProvider`, `SessionCreateHookProvider`.
+Optional interfaces: `Initializer`, `EndpointProvider`, `SchemaProvider` (declares the columns the plugin adds, consumed by `goten generate`), `UserCreateHookProvider`, `SessionCreateHookProvider`.
 
 ## Architecture
 
@@ -123,6 +187,7 @@ Optional interfaces: `Initializer`, `EndpointProvider`, `SchemaProvider`, `Migra
 github.com/dnahilman/goten              ← core (Auth, session, crypto, plugin system)
 github.com/dnahilman/goten/adapters/gorm  ← GORM adapter (separate module)
 github.com/dnahilman/goten/plugins/username ← username plugin (separate module)
+github.com/dnahilman/goten/plugins/oauth   ← OAuth plugin + Google provider (separate module)
 github.com/dnahilman/goten/cmd/goten    ← CLI tool (separate module)
 ```
 
@@ -158,7 +223,7 @@ auth, _ := goten.New(goten.Config{
 | Multi-module plugins | ✅ | ✅ (subpath) | ✅ | ❌ |
 | CLI migration tool | ✅ | ✅ | ✅ | ❌ |
 | Map-based adapter | ✅ | — | ✅ | ✅ |
-| OAuth providers | 🔜 | ✅ | ✅ | ✅ |
+| OAuth providers | ✅ (Google) | ✅ | ✅ | ✅ |
 | Language | Go | TypeScript | Go | Go |
 
 ## Contributing
