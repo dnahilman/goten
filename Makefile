@@ -1,4 +1,4 @@
-.PHONY: help build test test-integration tidy lint fmt cli example pg-up pg-down migrate clean release-check \
+.PHONY: help build test test-integration tidy lint fmt cli example pg-up pg-down generate clean release-check \
 	tag-core tag-adapter-gorm tag-plugin-username tag-cmd
 
 help:
@@ -11,10 +11,10 @@ help:
 	@echo "  fmt                Format all Go files"
 	@echo "  tidy               go mod tidy across all modules"
 	@echo "  cli                Build CLI binary to bin/goten"
-	@echo "  example            Run example app (requires postgres up + migrations applied)"
+	@echo "  example            Run example app (requires postgres up)"
 	@echo "  pg-up              Start Postgres via docker-compose"
 	@echo "  pg-down            Stop Postgres"
-	@echo "  migrate            Apply all pending migrations"
+	@echo "  generate           Generate ORM models for the bundled example"
 	@echo "  clean              Remove bin/ and Go test cache"
 	@echo "  release-check         Full check before tagging (build + test + lint)"
 	@echo ""
@@ -27,10 +27,12 @@ build:
 	go build ./...
 	cd adapters/gorm && go build ./...
 	cd plugins/username && go build ./...
+	cd plugins/oauth && go build ./...
 	cd cmd/goten && go build ./...
 	cd test && go build ./...
 	cd examples/basic && go build ./...
 	cd examples/layered-gin && go build ./...
+	cd examples/oauth-google && go build ./...
 
 test:
 	go test ./internal/...
@@ -46,8 +48,10 @@ tidy:
 	cd plugins/username && go mod tidy
 	cd cmd/goten && go mod tidy
 	cd test && go mod tidy
+	cd plugins/oauth && go mod tidy
 	cd examples/basic && go mod tidy
 	cd examples/layered-gin && go mod tidy
+	cd examples/oauth-google && go mod tidy
 
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "Install golangci-lint: https://golangci-lint.run/usage/install/"; exit 1; }
@@ -70,10 +74,10 @@ pg-up:
 pg-down:
 	docker-compose -f docker-compose.dev.yml down
 
-migrate: cli
-	cd examples/basic && ../../bin/goten init && ../../bin/goten migrate up
+generate: cli
+	cd examples/basic && ../../bin/goten generate -y
 
-example: cli pg-up migrate
+example: cli pg-up generate
 	cd examples/basic && go run .
 
 clean:

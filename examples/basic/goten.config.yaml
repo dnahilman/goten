@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/dnahilman/goten/main/goten.config.schema.json
-database:
-  url: postgres://goten:goten@localhost:5432/goten?sslmode=disable
-  driver: postgres
+plugins:
+  - username
 
-migrations:
-  plugins:
-    - username
+generate:
+  output_dir: ./internal/auth
+  package: authmodels
+  orm: gorm

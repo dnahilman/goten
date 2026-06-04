@@ -7,6 +7,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed (breaking, pre-v1)
 
+- **CLI is now generate-only (no SQL migrations).** Replaced `goten init` / `goten migrate
+  up|down|status|generate` with a single **`goten generate`** that emits ORM models (GORM
+  structs) from the core schema plus the enabled plugins' `SchemaProvider.Schema()`. Apply the
+  schema with your ORM — `db.AutoMigrate(authmodels.AllModels()...)`. Removed: the
+  `goten_migrations` tracking table, all `*.sql` migration files, `//go:embed migrations`,
+  `goten.CoreMigrationsFS`, plugin `MigrationsFS`, the `MigrationProvider` interface, and the
+  DB/env fields from `goten.config.yaml`.
+- **`goten.config.yaml` reshaped**: top-level `plugins: [...]` plus a `generate:` block
+  (`output_dir`, `package`, `orm`). Removed `database`, `migrations`, `env_file`, `generate_dir`.
+- **Core schema now declared in Go** via `goten.CoreSchema()`; `FieldDef` gained
+  `Index`/`PrimaryKey`/`Default` and `TableSchema` gained `UniqueTogether`.
+- **`SchemaProvider` is the source of truth** for code generation (was advisory introspection).
+
+### Superseded (historical, from the now-removed SQL-migration CLI)
+
 - **Migrations layout is now flat.** All SQL files (core + plugin) live in a single directory (`cfg.Migrations.CoreDir`, default `./migrations`). Plugin attribution is encoded in the filename: `<timestamp>_<plugin>_<name>.{up,down}.sql`. The legacy nested layout (`./plugins/<name>/migrations/`) is no longer supported by the discovery walker.
 - **Source migration files renamed** to the new convention:
   - `migrations/20260520120000_initial.{up,down}.sql` → `20260520120000_core_initial.{up,down}.sql`

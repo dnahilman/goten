@@ -1,0 +1,69 @@
+package testutil
+
+import "time"
+
+// Canonical GORM models for goten's schema (core + username + oauth columns),
+// mirroring what `goten generate` produces. Used by the GORM adapter integration
+// test to bootstrap the database via AutoMigrate instead of reading SQL files.
+
+type User struct {
+	ID            string    `gorm:"column:id;primaryKey"`
+	Email         string    `gorm:"column:email;uniqueIndex;not null"`
+	Name          string    `gorm:"column:name;not null;default:''"`
+	EmailVerified bool      `gorm:"column:email_verified;not null;default:false"`
+	Image         *string   `gorm:"column:image"`
+	Username      *string   `gorm:"column:username;uniqueIndex"`
+	CreatedAt     time.Time `gorm:"column:created_at;not null"`
+	UpdatedAt     time.Time `gorm:"column:updated_at;not null"`
+}
+
+func (User) TableName() string { return "users" }
+
+type Session struct {
+	ID        string    `gorm:"column:id;primaryKey"`
+	Token     string    `gorm:"column:token;uniqueIndex;not null"`
+	UserID    string    `gorm:"column:user_id;index;not null"`
+	ExpiresAt time.Time `gorm:"column:expires_at;index;not null"`
+	IPAddress *string   `gorm:"column:ip_address"`
+	UserAgent *string   `gorm:"column:user_agent"`
+	CreatedAt time.Time `gorm:"column:created_at;not null"`
+	UpdatedAt time.Time `gorm:"column:updated_at;not null"`
+	User      *User     `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
+}
+
+func (Session) TableName() string { return "sessions" }
+
+type Account struct {
+	ID                    string     `gorm:"column:id;primaryKey"`
+	UserID                string     `gorm:"column:user_id;index;not null"`
+	AccountID             string     `gorm:"column:account_id;uniqueIndex:uq_accounts_provider_id_account_id;not null"`
+	ProviderID            string     `gorm:"column:provider_id;uniqueIndex:uq_accounts_provider_id_account_id;not null"`
+	Password              *string    `gorm:"column:password"`
+	AccessToken           *string    `gorm:"column:access_token"`
+	RefreshToken          *string    `gorm:"column:refresh_token"`
+	IDToken               *string    `gorm:"column:id_token"`
+	AccessTokenExpiresAt  *time.Time `gorm:"column:access_token_expires_at"`
+	RefreshTokenExpiresAt *time.Time `gorm:"column:refresh_token_expires_at"`
+	Scope                 *string    `gorm:"column:scope"`
+	CreatedAt             time.Time  `gorm:"column:created_at;not null"`
+	UpdatedAt             time.Time  `gorm:"column:updated_at;not null"`
+	User                  *User      `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
+}
+
+func (Account) TableName() string { return "accounts" }
+
+type Verification struct {
+	ID         string    `gorm:"column:id;primaryKey"`
+	Identifier string    `gorm:"column:identifier;index;not null"`
+	Value      string    `gorm:"column:value;not null"`
+	ExpiresAt  time.Time `gorm:"column:expires_at;index;not null"`
+	CreatedAt  time.Time `gorm:"column:created_at;not null"`
+	UpdatedAt  time.Time `gorm:"column:updated_at;not null"`
+}
+
+func (Verification) TableName() string { return "verification" }
+
+// AuthModels returns the canonical models for db.AutoMigrate(...) in tests.
+func AuthModels() []any {
+	return []any{&User{}, &Session{}, &Account{}, &Verification{}}
+}

@@ -16,12 +16,39 @@ type Adapter struct {
 	db *gorm.DB
 }
 
-// compile-time interface check
-var _ adp.Adapter = (*Adapter)(nil)
+// compile-time interface checks
+var (
+	_ adp.Adapter  = (*Adapter)(nil)
+	_ adp.TxRunner = (*Adapter)(nil)
+)
 
 // New creates a new GORM adapter with silent logger.
 func New(db *gorm.DB) *Adapter {
 	return &Adapter{db: db.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)})}
+}
+
+// txKey carries an active *gorm.DB transaction in a context.
+type txKey struct{}
+
+func withTx(ctx context.Context, tx *gorm.DB) context.Context {
+	return context.WithValue(ctx, txKey{}, tx)
+}
+
+// conn returns the request-scoped DB handle: the active transaction when one is
+// present in ctx, otherwise the base connection bound to ctx.
+func (a *Adapter) conn(ctx context.Context) *gorm.DB {
+	if tx, ok := ctx.Value(txKey{}).(*gorm.DB); ok && tx != nil {
+		return tx
+	}
+	return a.db.WithContext(ctx)
+}
+
+// WithTransaction runs fn inside a database transaction. All Adapter calls made
+// with the context passed to fn participate in the same transaction.
+func (a *Adapter) WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
+	return a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(withTx(ctx, tx))
+	})
 }
 
 var validOperators = map[string]bool{
@@ -61,7 +88,7 @@ func (a *Adapter) applyWheres(tx *gorm.DB, wheres []adp.Where) (*gorm.DB, error)
 }
 
 func (a *Adapter) FindOne(ctx context.Context, model string, q adp.Query) (map[string]any, error) {
-	tx := a.db.WithContext(ctx).Table(model)
+	tx := a.conn(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
 		return nil, err
@@ -88,7 +115,7 @@ func (a *Adapter) FindOne(ctx context.Context, model string, q adp.Query) (map[s
 }
 
 func (a *Adapter) FindMany(ctx context.Context, model string, q adp.Query) ([]map[string]any, error) {
-	tx := a.db.WithContext(ctx).Table(model)
+	tx := a.conn(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
 		return nil, err
@@ -118,14 +145,14 @@ func (a *Adapter) FindMany(ctx context.Context, model string, q adp.Query) ([]ma
 }
 
 func (a *Adapter) Create(ctx context.Context, model string, data map[string]any) (map[string]any, error) {
-	if err := a.db.WithContext(ctx).Table(model).Create(&data).Error; err != nil {
+	if err := a.conn(ctx).Table(model).Create(&data).Error; err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
 func (a *Adapter) Update(ctx context.Context, model string, q adp.Query, data map[string]any) (map[string]any, error) {
-	tx := a.db.WithContext(ctx).Table(model)
+	tx := a.conn(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
 		return nil, err
@@ -137,7 +164,7 @@ func (a *Adapter) Update(ctx context.Context, model string, q adp.Query, data ma
 }
 
 func (a *Adapter) Delete(ctx context.Context, model string, q adp.Query) error {
-	tx := a.db.WithContext(ctx).Table(model)
+	tx := a.conn(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
 		return err
@@ -146,7 +173,7 @@ func (a *Adapter) Delete(ctx context.Context, model string, q adp.Query) error {
 }
 
 func (a *Adapter) Count(ctx context.Context, model string, q adp.Query) (int64, error) {
-	tx := a.db.WithContext(ctx).Table(model)
+	tx := a.conn(ctx).Table(model)
 	var err error
 	if tx, err = a.applyWheres(tx, q.Where); err != nil {
 		return 0, err

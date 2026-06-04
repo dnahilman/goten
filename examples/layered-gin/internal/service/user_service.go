@@ -7,9 +7,20 @@ import (
 
 	"github.com/dnahilman/goten/examples/layered-gin/internal/model"
 	"github.com/dnahilman/goten/examples/layered-gin/internal/repository"
+	"github.com/go-playground/validator/v10"
 )
 
 var phoneRe = regexp.MustCompile(`^\+?\d{8,15}$`)
+
+// validate carries a custom "phone" rule backed by phoneRe, so validation goes
+// through go-playground/validator instead of an ad-hoc regexp check.
+var validate = func() *validator.Validate {
+	v := validator.New(validator.WithRequiredStructEnabled())
+	_ = v.RegisterValidation("phone", func(fl validator.FieldLevel) bool {
+		return phoneRe.MatchString(fl.Field().String())
+	})
+	return v
+}()
 
 var ErrInvalidPhone = errors.New("phone must be 8-15 digits, optionally prefixed with +")
 
@@ -34,7 +45,7 @@ func (s *UserService) CreateProfile(ctx context.Context, userID, fullName string
 }
 
 func (s *UserService) UpdatePhone(ctx context.Context, userID, phone string) error {
-	if !phoneRe.MatchString(phone) {
+	if err := validate.Var(phone, "required,phone"); err != nil {
 		return ErrInvalidPhone
 	}
 	return s.repo.UpdatePhone(ctx, userID, phone)

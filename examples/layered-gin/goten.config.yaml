@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/dnahilman/goten/main/goten.config.schema.json
-env_file: .env
-database:
-  url: ${DATABASE_URL}
-migrations:
-  plugins:
-    - username
+plugins:
+  - username
+
+generate:
+  output_dir: ./internal/auth
+  package: authmodels
+  orm: gorm

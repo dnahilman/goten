@@ -90,6 +90,38 @@ func (a *Auth) InternalAdapter() *InternalAdapter { return a.ia }
 func (a *Auth) Sessions() *session.Manager        { return a.sessions }
 func (a *Auth) Plugins() []Plugin                 { return a.plugins }
 
+// CurrentSession resolves the active session and user from the request
+// (session cookie or Bearer token), applying sliding refresh. It is a
+// plugin-friendly helper for endpoints that need the caller's identity without
+// going through the RequireAuth middleware. Returns an error when there is no
+// valid session.
+func (a *Auth) CurrentSession(r *http.Request) (*models.Session, *models.User, error) {
+	token := session.GetSessionToken(r, a.cfg.Cookie.Name)
+	if token == "" {
+		return nil, nil, ErrNoSession
+	}
+	ctx := r.Context()
+	sess, err := a.sessions.Validate(ctx, token)
+	if err != nil {
+		return nil, nil, err
+	}
+	user, err := a.ia.FindUserByID(ctx, sess.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if user == nil {
+		return nil, nil, ErrUserNotFound
+	}
+	return sess, user, nil
+}
+
+// IsTrustedOrigin reports whether origin matches the configured BaseURL or one
+// of the TrustedOrigins. Exposed so plugins can validate redirect/callback URLs
+// (e.g. to prevent open-redirects in the OAuth flow).
+func (a *Auth) IsTrustedOrigin(origin string) bool {
+	return a.isTrustedOrigin(origin)
+}
+
 // SetSessionCookie is a plugin-friendly helper that sets the session cookie
 // using Auth's configured cookie settings. Plugins call this instead of
 // accessing the internal cookieConfig directly.

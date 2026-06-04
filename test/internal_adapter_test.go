@@ -2,6 +2,7 @@ package goten_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -156,4 +157,33 @@ func TestInternalAdapter_FindAccountsByUserID(t *testing.T) {
 	accounts, err := ia.FindAccountsByUserID(ctx, u.ID)
 	require.NoError(t, err)
 	assert.Len(t, accounts, 2)
+}
+
+// MockAdapter does not implement adp.TxRunner, so WithTransaction falls back to
+// running fn directly — it must still run fn and persist its writes.
+func TestInternalAdapter_WithTransaction_FallbackRunsFn(t *testing.T) {
+	ia := newIA(t)
+	ctx := context.Background()
+
+	ran := false
+	err := ia.WithTransaction(ctx, func(txCtx context.Context) error {
+		ran = true
+		_, err := ia.CreateUserWithExtra(txCtx, "tx@example.com", "Tx", true, nil)
+		return err
+	})
+	require.NoError(t, err)
+	assert.True(t, ran, "fn should have run")
+
+	u, err := ia.FindUserByEmail(ctx, "tx@example.com")
+	require.NoError(t, err)
+	assert.NotNil(t, u, "writes inside WithTransaction should persist")
+}
+
+func TestInternalAdapter_WithTransaction_PropagatesError(t *testing.T) {
+	ia := newIA(t)
+	sentinel := errors.New("boom")
+	err := ia.WithTransaction(context.Background(), func(context.Context) error {
+		return sentinel
+	})
+	assert.ErrorIs(t, err, sentinel)
 }

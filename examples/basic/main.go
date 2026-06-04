@@ -9,6 +9,7 @@ import (
 
 	goten "github.com/dnahilman/goten"
 	gormadapter "github.com/dnahilman/goten/adapters/gorm"
+	authmodels "github.com/dnahilman/goten/examples/basic/internal/auth"
 	usernameplugin "github.com/dnahilman/goten/plugins/username"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -24,6 +25,11 @@ func main() {
 		log.Fatalf("db open: %v", err)
 	}
 
+	// Create/upgrade goten's tables from the generated models (run `goten generate`).
+	if err := db.AutoMigrate(authmodels.AllModels()...); err != nil {
+		log.Fatalf("automigrate: %v", err)
+	}
+
 	auth, err := goten.New(goten.Config{
 		AppName:  "Goten Example",
 		BaseURL:  envOr("BASE_URL", "http://localhost:8080"),
@@ -35,7 +41,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		log.Fatalf("goten init: %v", err)
+		log.Fatalf("goten.New: %v", err)
 	}
 
 	mux := http.NewServeMux()

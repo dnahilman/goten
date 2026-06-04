@@ -12,7 +12,7 @@ func main() {
 	cmd := &cli.Command{
 		Name:    "goten",
 		Usage:   "Goten authentication CLI",
-		Version: "0.1.0",
+		Version: "0.2.0",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "config",
@@ -20,51 +20,27 @@ func main() {
 				Value:   "goten.config.yaml",
 				Usage:   "path to config file",
 			},
-			&cli.StringFlag{
-				Name:  "env-file",
-				Usage: "path to .env file (default: .env in current directory if it exists)",
-			},
 		},
 		Commands: []*cli.Command{
 			{
-				Name:   "init",
-				Usage:  "Scaffold core + plugin migration SQL files into your project",
-				Action: cmdInit,
+				Name:   "generate",
+				Usage:  "Generate ORM models from the active plugins' schema (run db.AutoMigrate on them)",
+				Action: cmdGenerate,
 				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:  "force",
-						Usage: "overwrite files that already exist with different content",
+					&cli.StringFlag{
+						Name:    "output",
+						Aliases: []string{"o"},
+						Usage:   "output file (default: <generate.output_dir>/auth_models.go)",
+					},
+					&cli.StringFlag{
+						Name:    "package",
+						Aliases: []string{"p"},
+						Usage:   "override the generated package name",
 					},
 					&cli.BoolFlag{
-						Name:  "no-scan",
-						Usage: "skip the Go-import scan that warns about drift between code and migrations.plugins",
-					},
-				},
-			},
-			{
-				Name:  "migrate",
-				Usage: "Database migration commands",
-				Commands: []*cli.Command{
-					{
-						Name:   "up",
-						Usage:  "Apply all pending migrations",
-						Action: cmdMigrateUp,
-					},
-					{
-						Name:   "down",
-						Usage:  "Roll back the last applied migration",
-						Action: cmdMigrateDown,
-					},
-					{
-						Name:   "status",
-						Usage:  "Show applied and pending migrations",
-						Action: cmdMigrateStatus,
-					},
-					{
-						Name:      "generate",
-						Usage:     "Generate a new migration template",
-						ArgsUsage: "<name>",
-						Action:    cmdMigrateGenerate,
+						Name:    "yes",
+						Aliases: []string{"y"},
+						Usage:   "overwrite an existing file without prompting",
 					},
 				},
 			},

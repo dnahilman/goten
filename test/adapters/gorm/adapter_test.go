@@ -4,7 +4,6 @@ package gormadapter_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
@@ -24,14 +23,12 @@ func setupDB(t *testing.T) (*gormadapter.Adapter, func()) {
 	require.NoError(t, db.Exec(`
 		DROP TABLE IF EXISTS accounts;
 		DROP TABLE IF EXISTS sessions;
+		DROP TABLE IF EXISTS verification;
 		DROP TABLE IF EXISTS users;
-		DROP TABLE IF EXISTS goten_migrations;
 	`).Error)
 
-	// Apply migration
-	sql, err := os.ReadFile("../../../migrations/20260520120000_core_initial.up.sql")
-	require.NoError(t, err)
-	require.NoError(t, db.Exec(string(sql)).Error)
+	// Bootstrap the schema the same way users do: AutoMigrate the generated models.
+	require.NoError(t, db.AutoMigrate(testutil.AuthModels()...))
 
 	return gormadapter.New(db), cleanup
 }

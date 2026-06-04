@@ -42,13 +42,13 @@ type EmailPasswordConfig struct {
 }
 
 func (c *Config) validate() error {
-	if c.BaseURL == "" {
+	if err := validate.Var(c.BaseURL, "required"); err != nil {
 		return errors.New("config: BaseURL required")
 	}
-	if c.Adapter == nil {
+	if err := validate.Var(c.Adapter, "required"); err != nil {
 		return errors.New("config: Adapter required")
 	}
-	if len(c.Secret) < 32 {
+	if err := validate.Var(c.Secret, "required,min=32"); err != nil {
 		return errors.New("config: Secret must be at least 32 bytes")
 	}
 	return nil

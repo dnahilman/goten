@@ -1,7 +1,6 @@
 package goten
 
 import (
-	"io/fs"
 	"net/http"
 )
 
@@ -32,29 +31,31 @@ type Endpoint struct {
 	Handler http.HandlerFunc
 }
 
-// SchemaProvider — plugin declares the DB columns it adds (for CLI introspection).
+// SchemaProvider — plugin declares the DB columns/tables it adds. This is the
+// source of truth for the `goten generate` CLI, which merges these with the core
+// schema to emit ORM models (e.g. GORM structs).
 type SchemaProvider interface {
 	Schema() map[string]TableSchema
 }
 
-// TableSchema describes columns a plugin adds to a table.
+// TableSchema describes the columns (and table-level constraints) for a table.
 type TableSchema struct {
 	Fields []FieldDef
+	// UniqueTogether lists composite-unique column groups, e.g.
+	// {{"provider_id", "account_id"}} for the accounts table.
+	UniqueTogether [][]string
 }
 
 // FieldDef describes a single column.
 type FieldDef struct {
-	Name     string
-	Type     string // "text", "boolean", "integer", "timestamp"
-	Required bool
-	Unique   bool
-	Ref      string // FK reference, e.g. "users.id"
-}
-
-// MigrationProvider — plugin has embedded SQL migration files.
-// The CLI (Issue 006) collects these alongside core migrations, ordered by timestamp.
-type MigrationProvider interface {
-	Migrations() fs.FS
+	Name       string
+	Type       string // "text", "boolean", "integer", "timestamp"
+	Required   bool   // NOT NULL
+	Unique     bool   // unique index
+	Index      bool   // non-unique index
+	PrimaryKey bool   // primary key column (e.g. id)
+	Ref        string // foreign key target "table.column" (onDelete CASCADE assumed)
+	Default    string // optional DDL default literal, e.g. "false", "''"
 }
 
 // SessionCreateHookProvider — plugin hooks into session creation.

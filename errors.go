@@ -29,4 +29,5 @@ var (
 	ErrSessionNotFound = &APIError{Code: "SESSION_NOT_FOUND", Message: "session not found", Status: 401}
 	ErrUnauthorized    = &APIError{Code: "UNAUTHORIZED", Message: "unauthorized", Status: 401}
 	ErrInternal        = &APIError{Code: "INTERNAL", Message: "internal server error", Status: 500}
+	ErrNoSession       = &APIError{Code: "UNAUTHORIZED", Message: "no session", Status: 401}
 )

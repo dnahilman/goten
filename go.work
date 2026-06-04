@@ -1,4 +1,4 @@
-go 1.23
+go 1.25.0
 
 use (
 	.
@@ -6,6 +6,8 @@ use (
 	./cmd/goten
 	./examples/basic
 	./examples/layered-gin
+	./examples/oauth-google
+	./plugins/oauth
 	./plugins/username
 	./test
 )

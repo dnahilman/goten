@@ -1,63 +1,97 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
+	goten "github.com/dnahilman/goten"
+	"github.com/dnahilman/goten/cmd/goten/generators"
 	"github.com/urfave/cli/v3"
 )
 
-func cmdMigrateGenerate(ctx context.Context, c *cli.Command) error {
-	if c.Args().Len() < 1 {
-		return fmt.Errorf("usage: goten migrate generate <name>")
+func cmdGenerate(_ context.Context, c *cli.Command) error {
+	cfg, err := loadConfig(c.String("config"))
+	if err != nil {
+		return err
 	}
-	name := sanitizeName(c.Args().First())
-	if name == "" {
-		return fmt.Errorf("migration name must contain at least one alphanumeric character")
+	if pkg := c.String("package"); pkg != "" {
+		cfg.Generate.Package = pkg
 	}
 
-	cfg, err := loadConfig(c.Root().String("config"), c.Root().String("env-file"))
+	schema, err := mergeSchema(cfg.Plugins)
 	if err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(cfg.GenerateDir, 0755); err != nil {
-		return fmt.Errorf("create generate_dir %q: %w", cfg.GenerateDir, err)
+	gen, ok := generators.Get(cfg.Generate.ORM)
+	if !ok {
+		return fmt.Errorf("unknown orm %q (available: %s)", cfg.Generate.ORM, strings.Join(generators.Available(), ", "))
+	}
+	res, err := gen.Generate(schema, generators.Options{
+		Package:    cfg.Generate.Package,
+		TableOrder: goten.CoreTableOrder,
+	})
+	if err != nil {
+		return err
 	}
 
-	ts := time.Now().UTC().Format("20060102150405")
-	upPath := filepath.Join(cfg.GenerateDir, fmt.Sprintf("%s_%s.up.sql", ts, name))
-	downPath := filepath.Join(cfg.GenerateDir, fmt.Sprintf("%s_%s.down.sql", ts, name))
-	now := time.Now().Format(time.RFC3339)
-
-	upContent := fmt.Sprintf("-- Migration: %s\n-- Created: %s\n\n-- Write your UP migration SQL here\n", name, now)
-	downContent := fmt.Sprintf("-- Rollback for: %s\n-- Created: %s\n\n-- Write your DOWN migration SQL here\n", name, now)
-
-	if err := os.WriteFile(upPath, []byte(upContent), 0644); err != nil {
-		return fmt.Errorf("write %s: %w", upPath, err)
-	}
-	if err := os.WriteFile(downPath, []byte(downContent), 0644); err != nil {
-		return fmt.Errorf("write %s: %w", downPath, err)
+	out := c.String("output")
+	if out == "" {
+		out = filepath.Join(cfg.Generate.OutputDir, "auth_models.go")
 	}
 
-	fmt.Printf("✓ Created %s\n", upPath)
-	fmt.Printf("✓ Created %s\n", downPath)
+	if existing, err := os.ReadFile(out); err == nil {
+		if string(existing) == res.Code {
+			fmt.Println("Schema already up to date:", out)
+			return nil
+		}
+		if !c.Bool("yes") && !confirm(fmt.Sprintf("%s already exists. Overwrite?", out)) {
+			return fmt.Errorf("generation aborted")
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return fmt.Errorf("create output dir: %w", err)
+	}
+	if err := os.WriteFile(out, []byte(res.Code), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", out, err)
+	}
+	fmt.Printf("🚀 Generated %d models → %s\n", len(schema), out)
 	return nil
 }
 
-func sanitizeName(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	s = strings.ReplaceAll(s, " ", "_")
-	s = strings.ReplaceAll(s, "-", "_")
-	var b strings.Builder
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
-			b.WriteRune(r)
+// mergeSchema combines the core schema with each active plugin's schema. Plugin
+// fields are appended to the table they extend; an unknown plugin is an error.
+func mergeSchema(plugins []string) (map[string]goten.TableSchema, error) {
+	merged := map[string]goten.TableSchema{}
+	for table, ts := range goten.CoreSchema() {
+		merged[table] = goten.TableSchema{
+			Fields:         append([]goten.FieldDef(nil), ts.Fields...),
+			UniqueTogether: append([][]string(nil), ts.UniqueTogether...),
 		}
 	}
-	return b.String()
+	for _, name := range plugins {
+		sp, ok := pluginRegistry[name]
+		if !ok {
+			return nil, fmt.Errorf("unknown plugin %q (available: %s)", name, strings.Join(availablePluginNames(), ", "))
+		}
+		for table, ts := range sp.Schema() {
+			cur := merged[table]
+			cur.Fields = append(cur.Fields, ts.Fields...)
+			cur.UniqueTogether = append(cur.UniqueTogether, ts.UniqueTogether...)
+			merged[table] = cur
+		}
+	}
+	return merged, nil
+}
+
+func confirm(prompt string) bool {
+	fmt.Printf("%s [y/N]: ", prompt)
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	line = strings.TrimSpace(strings.ToLower(line))
+	return line == "y" || line == "yes"
 }
