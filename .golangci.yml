@@ -1,40 +1,48 @@
+version: "2"
+
 run:
   timeout: 5m
-  go: "1.22"
 
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
-    - gofmt
-    - goimports
     - misspell
     - unconvert
     - unparam
     - revive
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-  revive:
+  settings:
+    errcheck:
+      check-type-assertions: true
+    revive:
+      rules:
+        - name: exported
+        - name: var-naming
+        - name: package-comments
+          disabled: true
+  exclusions:
+    # Restore golangci-lint v1's default exclusions (opt-in under v2). The
+    # `comments` preset suppresses "exported X should have comment" (EXC0012-15),
+    # keeping the prior CI behavior after the v2 migration.
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: exported
-      - name: var-naming
-      - name: package-comments
-        disabled: true
+      - path: _test\.go
+        linters:
+          - errcheck
+          - unparam
+    paths:
+      - examples
+      - bin
+      - docs
 
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - unparam
-  exclude-dirs:
-    - examples
-    - bin
-    - docs
+formatters:
+  enable:
+    - gofmt
+    - goimports

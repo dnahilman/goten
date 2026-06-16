@@ -8,7 +8,7 @@
 
 Goten is a modular authentication library for Go with a **multi-module plugin architecture** — install only what you need, no unused code in your binary.
 
-**Status**: 🚧 v0.1.0 — early release, API may change before v1.0
+**Status**: 🚧 v0.2.0 — early release, API may change before v1.0
 
 ## Features
 
@@ -58,6 +58,167 @@ With the **OAuth plugin** enabled:
 | `POST` | `/api/auth/unlink-account` | Unlink a provider |
 | `POST` | `/api/auth/get-access-token` | Get a valid provider access token |
 | `POST` | `/api/auth/refresh-token` | Refresh the stored provider tokens |
+
+## Client Integration (React + TypeScript)
+
+Goten uses an **HttpOnly cookie session** (`goten_session`, `SameSite=Lax`). The
+browser sends it automatically — your JS never reads the token. Two rules:
+
+1. Every request must send the cookie: `fetch(..., { credentials: "include" })`.
+2. The SPA origin must be allowed. Easiest is **same origin** (serve the SPA and
+   API from one host). For a separate dev origin (e.g. Vite on `:5173`), either
+   proxy `/api` to the backend, or set `TrustedOrigins` on the server and enable
+   CORS with credentials. Goten's CSRF check validates the `Origin` header on
+   unsafe methods against `TrustedOrigins`.
+
+### Typed client
+
+```ts
+// auth.ts — a tiny typed wrapper over goten's endpoints.
+const BASE = import.meta.env.VITE_API_URL ?? ""; // "" = same origin
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  emailVerified: boolean;
+  image?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Session {
+  id: string;
+  userId: string;
+  expiresAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SessionResponse {
+  user: User;
+  session: Session;
+}
+
+// goten errors: { code, message } with a non-2xx status.
+export class AuthError extends Error {
+  constructor(public code: string, message: string, public status: number) {
+    super(message);
+  }
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}/api/auth${path}`, {
+    ...init,
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...init?.headers },
+  });
+  const body = res.status === 204 ? null : await res.json().catch(() => null);
+  if (!res.ok) {
+    const e = (body ?? {}) as { code?: string; message?: string };
+    throw new AuthError(e.code ?? "ERROR", e.message ?? res.statusText, res.status);
+  }
+  return body as T;
+}
+
+export const auth = {
+  signUp: (data: { email: string; password: string; name: string }) =>
+    api<SessionResponse>("/sign-up/email", { method: "POST", body: JSON.stringify(data) }),
+
+  signIn: (data: { email: string; password: string }) =>
+    api<SessionResponse>("/sign-in/email", { method: "POST", body: JSON.stringify(data) }),
+
+  signOut: () => api<{ success: boolean }>("/sign-out", { method: "POST" }),
+
+  // Returns null when there is no active session (goten replies 401).
+  getSession: async (): Promise<SessionResponse | null> => {
+    try {
+      return await api<SessionResponse>("/get-session");
+    } catch (e) {
+      if (e instanceof AuthError && e.status === 401) return null;
+      throw e;
+    }
+  },
+
+  // OAuth plugin: redirect the browser to the provider.
+  signInSocial: async (provider: string, callbackURL: string) => {
+    const { url } = await api<{ url: string }>("/sign-in/social", {
+      method: "POST",
+      body: JSON.stringify({ provider, callbackURL }),
+    });
+    window.location.href = url;
+  },
+};
+```
+
+### React hook
+
+```tsx
+// useSession.tsx
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { auth, type User } from "./auth";
+
+interface AuthState {
+  user: User | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+const Ctx = createContext<AuthState | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    auth.getSession().then((s) => setUser(s?.user ?? null)).finally(() => setLoading(false));
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    const s = await auth.signIn({ email, password });
+    setUser(s.user);
+  };
+  const signOut = async () => {
+    await auth.signOut();
+    setUser(null);
+  };
+
+  return <Ctx.Provider value={{ user, loading, signIn, signOut }}>{children}</Ctx.Provider>;
+}
+
+export function useSession() {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error("useSession must be used within <AuthProvider>");
+  return ctx;
+}
+```
+
+```tsx
+// Usage
+function Profile() {
+  const { user, loading, signOut } = useSession();
+  if (loading) return <p>Loading…</p>;
+  if (!user) return <p>Not signed in</p>;
+  return (
+    <div>
+      <p>Hi, {user.name} ({user.email})</p>
+      <button onClick={signOut}>Sign out</button>
+    </div>
+  );
+}
+```
+
+> **Cross-origin dev (Vite on `:5173`).** Simplest is a dev proxy so the browser
+> stays same-origin — add to `vite.config.ts`:
+> ```ts
+> server: { proxy: { "/api": "http://localhost:8080" } }
+> ```
+> Then leave `VITE_API_URL` unset. Otherwise set `TrustedOrigins:
+> ["http://localhost:5173"]` on the server, serve CORS with
+> `Access-Control-Allow-Credentials: true`, and point `VITE_API_URL` at the API.
 
 ## CLI
 

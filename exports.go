@@ -28,6 +28,12 @@ func WriteError(w http.ResponseWriter, status int, code, message string) {
 	httputil.WriteError(w, status, code, message)
 }
 
+// GetClientIP resolves the client IP, preferring ipHeader (a header you control
+// at the edge) and otherwise falling back to X-Forwarded-For / X-Real-IP /
+// CF-Connecting-IP (left-most) then RemoteAddr. The value is used only to record
+// a session's ip_address; configure your reverse proxy to OVERWRITE
+// X-Forwarded-For so the left-most entry cannot be spoofed. See the package docs
+// and SECURITY.md ("Reverse proxy & client IP") for details.
 func GetClientIP(r *http.Request, ipHeader string) string {
 	return internal.GetClientIP(r, ipHeader)
 }

@@ -1,0 +1,8 @@
+# Normalize line endings to LF so gofmt/CI (Linux) and local checkouts agree,
+# regardless of core.autocrlf on Windows.
+* text=auto eol=lf
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
