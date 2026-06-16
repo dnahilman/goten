@@ -3,6 +3,19 @@
 All notable changes are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Admin plugin** (`github.com/dnahilman/goten/plugins/admin`) — administrative user management:
+  role management, ban/unban (revokes the user's sessions and blocks sign-in via a
+  `SessionCreateHook`), admin-side user CRUD, session control, and impersonation. Ships a small
+  reusable RBAC model (`plugins/admin/access`: statements → roles → `Authorize`) with an
+  `AdminUserIDs` escape hatch. Adds `role`/`banned`/`ban_reason`/`ban_expires` to `users` and
+  `impersonated_by` to `sessions`; registered with the `goten generate` CLI as `admin`.
+  Impersonation uses a fresh-session model (no signed-cookie restore) since goten exposes no
+  signed-cookie helper to plugins.
+
 ## [0.2.0] - 2026-06-04
 
 ### Added (this release)
