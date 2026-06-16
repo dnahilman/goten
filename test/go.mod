@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/dnahilman/goten v0.0.0
 	github.com/dnahilman/goten/adapters/gorm v0.0.0
+	github.com/dnahilman/goten/plugins/admin v0.0.0
 	github.com/dnahilman/goten/plugins/username v0.0.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.34.0
@@ -78,5 +79,6 @@ require (
 replace (
 	github.com/dnahilman/goten => ..
 	github.com/dnahilman/goten/adapters/gorm => ../adapters/gorm
+	github.com/dnahilman/goten/plugins/admin => ../plugins/admin
 	github.com/dnahilman/goten/plugins/username => ../plugins/username
 )

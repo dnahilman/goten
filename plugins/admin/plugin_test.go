@@ -342,5 +342,343 @@ func TestImpersonateAdminGuard(t *testing.T) {
 	}
 }
 
+func TestCreateUserGetUserAndSignIn(t *testing.T) {
+	auth, mem, _ := newAuth(t, Options{})
+	seedUser(mem, "admin-1", "admin@x.io", "admin")
+	h := auth.Handler()
+	adminTok := tokenFor(t, auth, "admin-1")
+
+	// create
+	rec, out := do(t, h, "POST", "/api/auth/admin/create-user", adminTok, map[string]any{
+		"email": "new@x.io", "password": "supersecret", "name": "New", "role": "user",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create-user: want 200, got %d (%s)", rec.Code, rec.Body)
+	}
+	u, _ := out["user"].(map[string]any)
+	if u["email"] != "new@x.io" || u["role"] != "user" {
+		t.Fatalf("created user wrong: %v", u)
+	}
+	newID, _ := u["id"].(string)
+
+	// the new user can sign in via the core email endpoint
+	rec, _ = do(t, h, "POST", "/api/auth/sign-in/email", "", map[string]any{
+		"email": "new@x.io", "password": "supersecret",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("sign-in created user: want 200, got %d (%s)", rec.Code, rec.Body)
+	}
+
+	// get-user round-trips
+	rec, out = do(t, h, "POST", "/api/auth/admin/get-user", adminTok, map[string]any{"userId": newID})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get-user: want 200, got %d", rec.Code)
+	}
+	if g, _ := out["user"].(map[string]any); g["id"] != newID {
+		t.Errorf("get-user returned wrong id: %v", g["id"])
+	}
+
+	// get-user not found
+	rec, _ = do(t, h, "POST", "/api/auth/admin/get-user", adminTok, map[string]any{"userId": "nope"})
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("get-user missing: want 404, got %d", rec.Code)
+	}
+}
+
+func TestCreateUserValidationAndPermission(t *testing.T) {
+	auth, mem, _ := newAuth(t, Options{})
+	seedUser(mem, "admin-1", "admin@x.io", "admin")
+	seedUser(mem, "user-1", "user@x.io", "user")
+	h := auth.Handler()
+	adminTok := tokenFor(t, auth, "admin-1")
+
+	cases := []struct {
+		name string
+		body map[string]any
+		want int
+	}{
+		{"invalid email", map[string]any{"email": "nope", "password": "supersecret"}, http.StatusBadRequest},
+		{"short password", map[string]any{"email": "a@x.io", "password": "short"}, http.StatusBadRequest},
+		{"unknown role", map[string]any{"email": "b@x.io", "password": "supersecret", "role": "wizard"}, http.StatusBadRequest},
+	}
+	for _, c := range cases {
+		rec, _ := do(t, h, "POST", "/api/auth/admin/create-user", adminTok, c.body)
+		if rec.Code != c.want {
+			t.Errorf("%s: want %d, got %d", c.name, c.want, rec.Code)
+		}
+	}
+
+	// duplicate email → 409
+	rec, _ := do(t, h, "POST", "/api/auth/admin/create-user", adminTok,
+		map[string]any{"email": "user@x.io", "password": "supersecret"})
+	if rec.Code != http.StatusConflict {
+		t.Errorf("duplicate email: want 409, got %d", rec.Code)
+	}
+
+	// non-admin cannot create
+	rec, _ = do(t, h, "POST", "/api/auth/admin/create-user", tokenFor(t, auth, "user-1"),
+		map[string]any{"email": "c@x.io", "password": "supersecret"})
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("non-admin create: want 403, got %d", rec.Code)
+	}
+}
+
+func TestListUsersAndSearch(t *testing.T) {
+	auth, mem, _ := newAuth(t, Options{})
+	seedUser(mem, "admin-1", "admin@x.io", "admin")
+	seedUser(mem, "alice", "alice@x.io", "user")
+	seedUser(mem, "bob", "bob@x.io", "user")
+	h := auth.Handler()
+	adminTok := tokenFor(t, auth, "admin-1")
+
+	rec, out := do(t, h, "GET", "/api/auth/admin/list-users", adminTok, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list-users: want 200, got %d (%s)", rec.Code, rec.Body)
+	}
+	if total, _ := out["total"].(float64); int(total) != 3 {
+		t.Errorf("total: want 3, got %v", out["total"])
+	}
+	if users, _ := out["users"].([]any); len(users) != 3 {
+		t.Errorf("users len: want 3, got %d", len(users))
+	}
+
+	// search filters by email substring
+	rec, out = do(t, h, "GET", "/api/auth/admin/list-users?search=alice", adminTok, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list-users search: %d", rec.Code)
+	}
+	if users, _ := out["users"].([]any); len(users) != 1 {
+		t.Errorf("search alice: want 1, got %d", len(users))
+	}
+
+	// non-admin denied
+	seedUser(mem, "user-1", "u1@x.io", "user")
+	rec, _ = do(t, h, "GET", "/api/auth/admin/list-users", tokenFor(t, auth, "user-1"), nil)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("non-admin list: want 403, got %d", rec.Code)
+	}
+}
+
+func TestUpdateUserWhitelist(t *testing.T) {
+	auth, mem, _ := newAuth(t, Options{})
+	seedUser(mem, "admin-1", "admin@x.io", "admin")
+	seedUser(mem, "user-1", "user@x.io", "user")
+	h := auth.Handler()
+	adminTok := tokenFor(t, auth, "admin-1")
+
+	// name is updatable; role must be ignored (it's set via set-role)
+	rec, _ := do(t, h, "POST", "/api/auth/admin/update-user", adminTok, map[string]any{
+		"userId": "user-1",
+		"data":   map[string]any{"name": "Renamed", "role": "admin"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update-user: want 200, got %d (%s)", rec.Code, rec.Body)
+	}
+	rec, out := do(t, h, "POST", "/api/auth/admin/get-user", adminTok, map[string]any{"userId": "user-1"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get-user: %d", rec.Code)
+	}
+	u, _ := out["user"].(map[string]any)
+	if u["name"] != "Renamed" {
+		t.Errorf("name not updated: %v", u["name"])
+	}
+	if u["role"] != "user" {
+		t.Errorf("role should not be updatable via update-user, got %v", u["role"])
+	}
+
+	// no updatable fields → 400
+	rec, _ = do(t, h, "POST", "/api/auth/admin/update-user", adminTok, map[string]any{
+		"userId": "user-1", "data": map[string]any{"banned": true},
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("update with no allowed fields: want 400, got %d", rec.Code)
+	}
+}
+
+func TestSetUserPassword(t *testing.T) {
+	auth, mem, _ := newAuth(t, Options{})
+	seedUser(mem, "admin-1", "admin@x.io", "admin")
+	h := auth.Handler()
+	adminTok := tokenFor(t, auth, "admin-1")
+
+	// create a user with a known password
+	rec, out := do(t, h, "POST", "/api/auth/admin/create-user", adminTok, map[string]any{
+		"email": "pw@x.io", "password": "oldpassword", "name": "PW",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create-user: %d (%s)", rec.Code, rec.Body)
+	}
+	id, _ := out["user"].(map[string]any)["id"].(string)
+
+	// change the password
+	rec, _ = do(t, h, "POST", "/api/auth/admin/set-user-password", adminTok, map[string]any{
+		"userId": id, "newPassword": "newpassword1",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("set-user-password: %d (%s)", rec.Code, rec.Body)
+	}
+
+	// old password fails, new password works
+	rec, _ = do(t, h, "POST", "/api/auth/sign-in/email", "", map[string]any{"email": "pw@x.io", "password": "oldpassword"})
+	if rec.Code == http.StatusOK {
+		t.Error("old password should no longer work")
+	}
+	rec, _ = do(t, h, "POST", "/api/auth/sign-in/email", "", map[string]any{"email": "pw@x.io", "password": "newpassword1"})
+	if rec.Code != http.StatusOK {
+		t.Errorf("new password should work, got %d (%s)", rec.Code, rec.Body)
+	}
+
+	// too-short password rejected
+	rec, _ = do(t, h, "POST", "/api/auth/admin/set-user-password", adminTok, map[string]any{
+		"userId": id, "newPassword": "short",
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("short password: want 400, got %d", rec.Code)
+	}
+}
+
+func TestRemoveUserAndSelfGuards(t *testing.T) {
+	auth, mem, _ := newAuth(t, Options{})
+	seedUser(mem, "admin-1", "admin@x.io", "admin")
+	seedUser(mem, "user-1", "user@x.io", "user")
+	h := auth.Handler()
+	adminTok := tokenFor(t, auth, "admin-1")
+
+	victimTok := tokenFor(t, auth, "user-1")
+	rec, _ := do(t, h, "POST", "/api/auth/admin/remove-user", adminTok, map[string]any{"userId": "user-1"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("remove-user: want 200, got %d (%s)", rec.Code, rec.Body)
+	}
+	// user gone + sessions revoked
+	rec, _ = do(t, h, "POST", "/api/auth/admin/get-user", adminTok, map[string]any{"userId": "user-1"})
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("removed user get: want 404, got %d", rec.Code)
+	}
+	if _, err := auth.Sessions().Validate(context.Background(), victimTok); err == nil {
+		t.Error("removed user's session should be revoked")
+	}
+
+	// cannot remove self
+	rec, _ = do(t, h, "POST", "/api/auth/admin/remove-user", adminTok, map[string]any{"userId": "admin-1"})
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("remove self: want 400, got %d", rec.Code)
+	}
+	// cannot ban self
+	rec, _ = do(t, h, "POST", "/api/auth/admin/ban-user", adminTok, map[string]any{"userId": "admin-1"})
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("ban self: want 400, got %d", rec.Code)
+	}
+}
+
+func TestSessionManagementEndpoints(t *testing.T) {
+	auth, mem, _ := newAuth(t, Options{})
+	seedUser(mem, "admin-1", "admin@x.io", "admin")
+	seedUser(mem, "user-1", "user@x.io", "user")
+	h := auth.Handler()
+	adminTok := tokenFor(t, auth, "admin-1")
+
+	s1 := tokenFor(t, auth, "user-1")
+	_ = tokenFor(t, auth, "user-1") // second session
+
+	// list → 2
+	rec, out := do(t, h, "POST", "/api/auth/admin/list-user-sessions", adminTok, map[string]any{"userId": "user-1"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list-user-sessions: %d (%s)", rec.Code, rec.Body)
+	}
+	sessions, _ := out["sessions"].([]any)
+	if len(sessions) != 2 {
+		t.Fatalf("want 2 sessions, got %d", len(sessions))
+	}
+
+	// revoke one by id
+	s1row, _ := mem.FindOne(context.Background(), "sessions", goten.Query{Where: []goten.Where{goten.EQ("token", s1)}})
+	rec, _ = do(t, h, "POST", "/api/auth/admin/revoke-user-session", adminTok, map[string]any{"sessionId": s1row["id"]})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("revoke-user-session: %d", rec.Code)
+	}
+	_, out = do(t, h, "POST", "/api/auth/admin/list-user-sessions", adminTok, map[string]any{"userId": "user-1"})
+	if sessions, _ := out["sessions"].([]any); len(sessions) != 1 {
+		t.Errorf("after revoke one: want 1, got %d", len(sessions))
+	}
+
+	// revoke all
+	rec, _ = do(t, h, "POST", "/api/auth/admin/revoke-user-sessions", adminTok, map[string]any{"userId": "user-1"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("revoke-user-sessions: %d", rec.Code)
+	}
+	_, out = do(t, h, "POST", "/api/auth/admin/list-user-sessions", adminTok, map[string]any{"userId": "user-1"})
+	if sessions, _ := out["sessions"].([]any); len(sessions) != 0 {
+		t.Errorf("after revoke all: want 0, got %d", len(sessions))
+	}
+}
+
+func TestHasPermissionEndpoint(t *testing.T) {
+	auth, mem, _ := newAuth(t, Options{})
+	seedUser(mem, "admin-1", "admin@x.io", "admin")
+	h := auth.Handler()
+	adminTok := tokenFor(t, auth, "admin-1")
+
+	// caller (admin) can ban
+	rec, out := do(t, h, "POST", "/api/auth/admin/has-permission", adminTok, map[string]any{
+		"permissions": map[string]any{"user": []any{"ban"}},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("has-permission: %d (%s)", rec.Code, rec.Body)
+	}
+	if out["success"] != true {
+		t.Error("admin should be allowed to ban")
+	}
+
+	// explicit role=user cannot ban
+	_, out = do(t, h, "POST", "/api/auth/admin/has-permission", adminTok, map[string]any{
+		"permissions": map[string]any{"user": []any{"ban"}},
+		"role":        "user",
+	})
+	if out["success"] != false {
+		t.Error("user role should not be allowed to ban")
+	}
+}
+
+func TestCustomRoleGranularity(t *testing.T) {
+	moderator := access.DefaultAC.NewRole(access.Statements{
+		"user":    {"list", "get", "ban"},
+		"session": {"list"},
+	})
+	auth, mem, _ := newAuth(t, Options{
+		AdminRoles: []string{"admin"},
+		Roles: map[string]*access.Role{
+			"admin":     access.AdminRole,
+			"moderator": moderator,
+			"user":      access.UserRole,
+		},
+	})
+	seedUser(mem, "mod-1", "mod@x.io", "moderator")
+	seedUser(mem, "user-1", "user@x.io", "user")
+	h := auth.Handler()
+	modTok := tokenFor(t, auth, "mod-1")
+
+	// moderator can ban
+	rec, _ := do(t, h, "POST", "/api/auth/admin/ban-user", modTok, map[string]any{"userId": "user-1"})
+	if rec.Code != http.StatusOK {
+		t.Errorf("moderator ban: want 200, got %d (%s)", rec.Code, rec.Body)
+	}
+	// but cannot set-role (lacks user:set-role)
+	rec, _ = do(t, h, "POST", "/api/auth/admin/set-role", modTok, map[string]any{"userId": "user-1", "role": "admin"})
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("moderator set-role: want 403, got %d", rec.Code)
+	}
+}
+
+func TestStopImpersonatingWhenNotImpersonating(t *testing.T) {
+	auth, mem, _ := newAuth(t, Options{})
+	seedUser(mem, "user-1", "user@x.io", "user")
+	h := auth.Handler()
+
+	rec, _ := do(t, h, "POST", "/api/auth/admin/stop-impersonating", tokenFor(t, auth, "user-1"), nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("stop when not impersonating: want 400, got %d", rec.Code)
+	}
+}
+
 // authMem extracts the mem adapter from an Auth for tests that didn't capture it.
 func authMem(a *goten.Auth) *memAdapter { return a.Adapter().(*memAdapter) }
