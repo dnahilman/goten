@@ -4,16 +4,12 @@ go 1.25.0
 
 require (
 	github.com/dnahilman/goten v0.2.0
-	github.com/dnahilman/goten/plugins/admin v0.0.0
+	github.com/dnahilman/goten/plugins/admin v0.3.0
 	github.com/dnahilman/goten/plugins/oauth v0.2.0
 	github.com/dnahilman/goten/plugins/username v0.2.0
 	github.com/urfave/cli/v3 v3.9.0
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-// admin has no published tag yet; resolve it locally during development.
-// REMOVE this replace and bump the require above to the real version at release.
-replace github.com/dnahilman/goten/plugins/admin => ../../plugins/admin
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect

@@ -2,6 +2,9 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dnahilman/goten v0.2.0 h1:bjLTS7SMieTDXx159S+lW70easFRKGHDjORm62JZ2hw=
+github.com/dnahilman/goten v0.2.0/go.mod h1:ksck1eTDqX3x/nvMoZ1L8nr1W9zqrZrATzvptET0lGU=
+github.com/dnahilman/goten/plugins/admin v0.3.0 h1:xNGqxScbOFqoDng1s3T5qRQ2eEJ5JZV8APO+LuNo8YE=
+github.com/dnahilman/goten/plugins/admin v0.3.0/go.mod h1:WkuV3FxJ1dvd5VMtet81zq3MWMbx10xX45KAtH36nJ0=
 github.com/dnahilman/goten/plugins/oauth v0.2.0 h1:xKXOT7vDJWAyWV8L3zgBfdYfJVI2jgXrNkAj3CUzK3k=
 github.com/dnahilman/goten/plugins/oauth v0.2.0/go.mod h1:b2qpEg7l4g1LYyT2BHM+hWH3KDCAr+IzJu8d5URo9og=
 github.com/dnahilman/goten/plugins/username v0.2.0 h1:740GsnbbOhYEoX/Ppa3snkBxwgc2CjMIKm4VL16t+Es=
