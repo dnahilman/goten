@@ -12,7 +12,7 @@
       "items": {
         "type": "string",
         "pattern": "^[a-z][a-z0-9_]*$",
-        "examples": ["username", "oauth"]
+        "examples": ["username", "oauth", "admin"]
       },
       "default": []
     },

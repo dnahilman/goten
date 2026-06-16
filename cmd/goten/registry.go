@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	goten "github.com/dnahilman/goten"
+	adminplugin "github.com/dnahilman/goten/plugins/admin"
 	oauthplugin "github.com/dnahilman/goten/plugins/oauth"
 	usernameplugin "github.com/dnahilman/goten/plugins/username"
 )
@@ -17,6 +18,7 @@ import (
 var pluginRegistry = map[string]goten.SchemaProvider{
 	"username": usernameplugin.New(usernameplugin.Options{}),
 	"oauth":    oauthplugin.New(oauthplugin.Options{}),
+	"admin":    adminplugin.New(adminplugin.Options{}),
 }
 
 // availablePluginNames returns the registered plugin shorthand names, sorted.

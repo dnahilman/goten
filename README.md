@@ -19,7 +19,8 @@ Goten is a modular authentication library for Go with a **multi-module plugin ar
 | ✅ Cookie + Bearer auth | ✅ CLI migration tool |
 | ✅ GORM adapter (Postgres) | ✅ CSRF origin check |
 | ✅ Anti-enumeration on sign-in | ✅ OAuth plugin — Sign in with Google (PKCE + OIDC) |
-| ✅ Session list/revoke | 🔜 Magic link, 2FA, JWT plugin |
+| ✅ Session list/revoke | ✅ Admin plugin — roles, ban, impersonation (RBAC) |
+| ✅ CSRF origin check | 🔜 Magic link, 2FA, JWT plugin |
 
 ## Quick Start
 
@@ -325,6 +326,41 @@ Security: PKCE (S256), CSRF state (verification row + signed cookie), redirect-o
 validation, and anti account-takeover linking (an existing user is auto-linked only when the
 provider's email is verified and, by default, the local account is verified too). Full
 walkthrough — including Google Cloud Console setup — in [`examples/oauth-google/`](examples/oauth-google/).
+
+### Admin Plugin (roles, ban, impersonation)
+
+Administrative user management with a reusable **RBAC** model: role management,
+ban/unban, admin-side user CRUD, session control, and impersonation.
+
+```bash
+go get github.com/dnahilman/goten/plugins/admin
+```
+
+```go
+import (
+    adminplugin "github.com/dnahilman/goten/plugins/admin"
+    "github.com/dnahilman/goten/plugins/admin/access"
+)
+
+auth, _ := goten.New(goten.Config{
+    // ...
+    Plugins: []goten.Plugin{
+        adminplugin.New(adminplugin.Options{
+            AdminUserIDs: []string{"g10_...bootstrap-admin-id..."}, // bypass roles
+            // Roles: map[string]*access.Role{...}, // optional custom RBAC
+        }),
+    },
+})
+```
+
+Add `admin` to `goten.config.yaml`, run `goten generate`, and apply the models.
+The plugin adds `role`/`banned`/`ban_reason`/`ban_expires` to `users` and
+`impersonated_by` to `sessions`. Routes are mounted under `/api/auth/admin/*`
+(e.g. `set-role`, `ban-user`, `impersonate-user`, `list-users`), each gated by a
+permission like `user:ban`. Bans revoke the user's sessions and block sign-in.
+
+Full options, the endpoint table, the RBAC statement/role model, and the
+impersonation design note are in [`plugins/admin/README.md`](plugins/admin/README.md).
 
 ### Building Your Own Plugin
 
